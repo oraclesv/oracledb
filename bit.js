@@ -3,35 +3,19 @@ const RpcClient = require('bitcoind-rpc')
 const TNA = require('tna')
 const pLimit = require('p-limit')
 const pQueue = require('p-queue')
+const bsv = require('bsv')
 const Config = require('./config.js')
+const { db } = require('./config.js')
 const queue = new pQueue({concurrency: Config.rpc.limit})
-const mingo = require('mingo')
-const jq = require('bigjq')
-const bcode = require('bcode')
-
-const Filter = require('./bitdb.json')
 
 var Db
 var Info
 var rpc
-var filter
-var processor
 
 const init = function(db, info) {
   return new Promise(function(resolve) {
     Db = db
     Info = info
-
-    if (Filter.filter && Filter.filter.q && Filter.filter.q.find) {
-      let query = bcode.encode(Filter.filter.q.find)
-      filter = new mingo.Query(query)
-    } else {
-      filter = null
-    }
-
-    if (Filter.filter && Filter.filter.r && Filter.filter.r.f) {
-      processor = Filter.filter.r.f
-    }
 
     rpc = new RpcClient(Config.rpc)
     resolve()
@@ -98,6 +82,7 @@ const request = {
 }
 const crawl = async function(block_index) {
   let block_content = await request.block(block_index)
+  console.log('block_content', block_content)
   let block_hash = block_content.result.hash
   let block_time = block_content.result.time
 
@@ -121,17 +106,18 @@ const crawl = async function(block_index) {
     }
     let btxs = await Promise.all(tasks)
 
-    if (filter) {
-      btxs = btxs.filter(function(row) {
-        return filter.test(row)
-      })
+    //TODO: filter the tx
+    //if (filter) {
+    //  btxs = btxs.filter(function(row) {
+    //    return filter.test(row)
+    //  })
 
-      if (processor) {
-        btxs = bcode.decode(btxs)
-        btxs  = await jq.run(processor, btxs)
-      }
-      console.log('Filtered Xputs = ', btxs.length)
-    }
+    //  if (processor) {
+    //    btxs = bcode.decode(btxs)
+    //    btxs  = await jq.run(processor, btxs)
+    //  }
+    //  console.log('Filtered Xputs = ', btxs.length)
+    //}
 
     console.log('Block ' + block_index + ' : ' + txs.length + 'txs | ' + btxs.length + ' filtered txs')
     return btxs
@@ -139,27 +125,32 @@ const crawl = async function(block_index) {
     return []
   }
 }
-const outsock = zmq.socket('pub')
 const listen = function() {
   let sock = zmq.socket('sub')
   sock.connect('tcp://' + Config.zmq.incoming.host + ':' + Config.zmq.incoming.port)
   sock.subscribe('hashtx')
   sock.subscribe('hashblock')
+  sock.subscribe('rawtx')
+  sock.subscribe('rawblock')
   console.log('Subscriber connected to port ' + Config.zmq.incoming.port)
-
-  outsock.bindSync('tcp://' + Config.zmq.outgoing.host + ':' + Config.zmq.outgoing.port)
-  console.log('Started publishing to ' + Config.zmq.outgoing.host + ':' + Config.zmq.outgoing.port)
 
   // Listen to ZMQ
   sock.on('message', async function(topic, message) {
     if (topic.toString() === 'hashtx') {
       let hash = message.toString('hex')
       console.log('New mempool hash from ZMQ = ', hash)
-      await sync('mempool', hash)
+      //await sync('mempool', hash)
     } else if (topic.toString() === 'hashblock') {
       let hash = message.toString('hex')
       console.log('New block hash from ZMQ = ', hash)
-      await sync('block')
+      //await sync('block')
+    } else if (topic.toString() === 'rawtx') {
+      console.log('New rawtx from ZMQ')
+      //TODO: not await
+      await processRawTx(message)
+    } else if (topic.toString() === 'rawblock') {
+      console.log('New block from ZMQ')
+      await processRawBlock(message)
     }
   })
 
@@ -170,10 +161,43 @@ const listen = function() {
 
 }
 
+const isBacktraceTx = function(tx) {
+  return true
+}
+
+const processRawTx = async function(rawtx) {
+  let tx = new bsv.Transaction()
+  tx.fromBuffer(rawtx)
+  await processTx(tx)
+}
+
+const processTx = async function(tx) {
+  if (isBacktraceTx(tx)) {
+    //TODO: check the tx
+    let jsontx = tx.toJSON()
+    //TODO: use hash as the mongo _id, if _id performance will be affected, hash must be unique
+    jsontx['_id'] = jsontx['hash']
+    delete jsontx['hash']
+    console.log('processTx: jsontx', jsontx)
+    let res = await Db.tx.insert(jsontx)
+    //TODO: handle the failed situation
+    console.log('processTx: insert res:', res)
+  }
+}
+
+const processRawBlock = async function(rawblock) {
+  let block = bsv.Block.fromRawBlock(rawblock)
+  //block.fromBuffer(rawblock)
+  for (var i = 0; i < block.transactions.length; i++) {
+    await processTx(block.transactions[i])
+  }
+}
+
 const sync = async function(type, hash) {
-  if (type === 'block') {
+  //TODO:
+  if (type === 'block11') {
     try {
-      const lastSynchronized = await Info.checkpoint()
+      const lastSynchronized = Info.checkpoint()
       const currentHeight = await request.height()
       console.log('Last Synchronized = ', lastSynchronized)
       console.log('Current Height = ', currentHeight)
@@ -197,7 +221,6 @@ const sync = async function(type, hash) {
         // zmq broadcast
         let b = { i: index, txs: content }
         console.log('Zmq block = ', JSON.stringify(b, null, 2))
-        outsock.send(['block', JSON.stringify(b)])
       }
 
       // clear mempool and synchronize
@@ -227,7 +250,6 @@ const sync = async function(type, hash) {
         await Db.mempool.insert(content)
         console.log('# Q inserted [size: ' + queue.size + ']',  hash)
         console.log(content)
-        outsock.send(['mempool', JSON.stringify(content)])
       } catch (e) {
         // duplicates are ok because they will be ignored
         if (e.code == 11000) {

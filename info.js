@@ -1,56 +1,26 @@
-const level = require('level')
-const kv = level('./.state')
 const Filter = require('./bitdb.json')
+const Db = require('./db')
 /**
 * Return the last synchronized checkpoint
 */
+
+let tip = Filter.from
+
 const checkpoint = function() {
   return new Promise(async function(resolve, reject) {
-    kv.get('tip', function(err, value) {
-      if (err) {
-        if (err.notFound) {
-          console.log('Checkpoint not found, starting from GENESIS')
-          resolve(Filter.from)
-        } else {
-          console.log('err', err)
-          reject(err)
-        }
-      } else {
-        let cp = parseInt(value)
-        console.log('Checkpoint found,', cp)
-        resolve(cp)
-      }
-    })
+    resolve(tip)
   })
 }
 const updateTip = function(index) {
   return new Promise(function(resolve, reject) {
-    kv.put('tip', index, function(err) {
-      if (err) {
-        console.log(err)
-        reject()
-      } else {
-        console.log('Tip updated to', index)
-        resolve()
-      }
-    })
-  })
-}
-const deleteTip = function() {
-  return new Promise(function(resolve, reject) {
-    kv.del('tip', function(err) {
-      if (err) {
-        console.log(err)
-        reject()
-      } else {
-        console.log('Tip deleted')
-        resolve()
-      }
-    })
+    let res = await Db.info.updateHeight(index)
+    console.log('updateTip: res:', res)
+    //TODO: handle failed
+    tip = index
+    resolve()
   })
 }
 module.exports = {
   checkpoint: checkpoint,
   updateTip: updateTip,
-  deleteTip: deleteTip
 }

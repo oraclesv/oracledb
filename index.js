@@ -14,17 +14,18 @@ const daemon = {
     await Bit.init(Db, Info)
 
     // 2. Bootstrap actions depending on first time
-    const lastSynchronized = await Info.checkpoint()
+    const dbheight = await Db.info.getHeight()
+
+    let height = max(dbheight, Info.checkpoint())
+    await Info.updateTip(height)
+
+    console.log("init db height:", height)
 
     console.time('Indexing Keys')
-    if (lastSynchronized === Filter.from) {
-      // First time. Try indexing
-      console.log('Indexing...', new Date())
-      await Db.block.index()
-    }
+    await Db.block.index()
     console.timeEnd('Indexing Keys')
 
-    if (lastSynchronized !== Filter.from) {
+    /*if (lastSynchronized !== Filter.from) {
       // Resume
       // Rewind one step and start
       // so that it can recover even in cases
@@ -32,7 +33,7 @@ const daemon = {
       // and the block was not indexed completely.
       console.log('Resuming...')
       await util.fix(lastSynchronized-1)
-    }
+    }*/
 
     // 3. Start synchronizing
     console.log('Synchronizing...', new Date())
@@ -53,14 +54,13 @@ const util = {
       if (process.argv.length > 3) {
         from = parseInt(process.argv[3])
       } else {
-        from = await Info.checkpoint()
+        from = Info.checkpoint()
       }
       await util.fix(from)
       process.exit()
     } else if (cmd === 'reset') {
       await Db.block.reset()
       await Db.mempool.reset()
-      await Info.deleteTip()
       process.exit()
     } else if (cmd === 'index') {
       await Db.block.index()

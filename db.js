@@ -19,6 +19,22 @@ var exit = function() {
     resolve()
   })
 }
+var tx = {
+  insert: function(item) {
+    return db.collection('tx').insertOne(item)
+  }
+}
+
+var info = {
+  getHeight: function() {
+    res =  db.collection('info').findOne({'_id': 'height'})
+    return res
+  },
+  updateHeight: function(height) {
+    res = db.collection('info').updateOne({'_id': 'height'}, {'value': height, 'upsert': 1})
+  }
+}
+
 var mempool =  {
   insert: function(item) {
     return db.collection('unconfirmed').insertMany([item])
@@ -120,7 +136,6 @@ var block = {
       for(let j=0; j<collectionNames.length; j++) {
         let collectionName = collectionNames[j]
         let keys = config.index[collectionName].keys
-        let fulltext = config.index[collectionName].fulltext
         if (keys) {
           console.log('Indexing keys...')
           for(let i=0; i<keys.length; i++) {
@@ -142,21 +157,6 @@ var block = {
             console.timeEnd('Index:' + keys[i])
           }
         }
-        if (fulltext) {
-          console.log('Creating full text index...')
-          let o = {}
-          fulltext.forEach(function(key) {
-            o[key] = 'text'
-          })
-          console.time('Fulltext search for ' + collectionName, o)
-          try {
-            await db.collection(collectionName).createIndex(o, { name: 'fulltext' })
-          } catch (e) {
-            console.log(e)
-            process.exit()
-          }
-          console.timeEnd('Fulltext search for ' + collectionName)
-        }
       }
     }
 
@@ -175,5 +175,5 @@ var block = {
   }
 }
 module.exports = {
-  init: init, exit: exit, block: block, mempool: mempool
+  init: init, exit: exit, block: block, mempool: mempool, tx: tx
 }
