@@ -4,23 +4,17 @@ const Db = require('./db')
 * Return the last synchronized checkpoint
 */
 
-let tip = Filter.from
+let height = Filter.from
 
 const checkpoint = function() {
-  return new Promise(async function(resolve, reject) {
-    resolve(tip)
-  })
+  return height
 }
-const updateTip = function(index) {
-  return new Promise(function(resolve, reject) {
-    let res = await Db.info.updateHeight(index)
-    console.log('updateTip: res:', res)
-    //TODO: handle failed
-    tip = index
-    resolve()
-  })
+const updateHeight = async function(index) {
+  await Db.info.updateHeight(index)
+  height = index
+  console.log('updateHeight:', height)
 }
 module.exports = {
   checkpoint: checkpoint,
-  updateTip: updateTip,
+  updateHeight: updateHeight,
 }

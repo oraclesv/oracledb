@@ -1,16 +1,17 @@
 const zmq = require('zeromq')
 const RpcClient = require('bitcoind-rpc')
-const TNA = require('tna')
 const pLimit = require('p-limit')
 const pQueue = require('p-queue')
 const bsv = require('bsv')
 const Config = require('./config.js')
-const { db } = require('./config.js')
+const db = require('./db.js')
 const queue = new pQueue({concurrency: Config.rpc.limit})
 
 var Db
 var Info
 var rpc
+
+let unconfirmed = {}
 
 const init = function(db, info) {
   return new Promise(function(resolve) {
@@ -51,9 +52,17 @@ const request = {
       })
     })
   },
-  tx: async function(hash) {
-    let content = await TNA.fromHash(hash, Config.rpc)
-    return content
+  tx: function(hash) {
+    return new Promise(function(resolve) {
+      rpc.getRawTransaction(hash, function(err, res) {
+        if (err) {
+          console.log('Err = ', err)
+          throw new Error(err)
+        } else {
+          resolve(res.result)
+        }
+      })
+    })
   },
   mempool: function() {
     return new Promise(function(resolve) {
@@ -67,10 +76,11 @@ const request = {
           console.log('txs = ', txs.length)
           for(let i=0; i<txs.length; i++) {
             tasks.push(limit(async function() {
-              let content = await request.tx(txs[i]).catch(function(e) {
+              let rawtx = await request.tx(txs[i]).catch(function(e) {
                 console.log('Error = ', e)
               })
-              return content
+              txid = await processRawTx(rawtx, confirmed=1)
+              return txid
             }))
           }
           let btxs = await Promise.all(tasks)
@@ -82,42 +92,24 @@ const request = {
 }
 const crawl = async function(block_index) {
   let block_content = await request.block(block_index)
-  console.log('block_content', block_content)
-  let block_hash = block_content.result.hash
-  let block_time = block_content.result.time
+  //console.log('block_content', block_content)
 
   if (block_content && block_content.result) {
     let txs = block_content.result.tx
     console.log('crawling txs = ', txs.length)
+    console.log('crawling txs:', txs)
     let tasks = []
     const limit = pLimit(Config.rpc.limit)
-    for(let i=0; i<txs.length; i++) {
+    for(let i = 0; i < txs.length; i++) {
       tasks.push(limit(async function() {
-        let t = await request.tx(txs[i]).catch(function(e) {
+        let rawtx = await request.tx(txs[i]).catch(function(e) {
           console.log('Error = ', e)
         })
-        t.blk = {
-          i: block_index,
-          h: block_hash,
-          t: block_time
-        }
-        return t
+        txid = await processRawTx(rawtx, confirmed=1)
+        return txid
       }))
     }
     let btxs = await Promise.all(tasks)
-
-    //TODO: filter the tx
-    //if (filter) {
-    //  btxs = btxs.filter(function(row) {
-    //    return filter.test(row)
-    //  })
-
-    //  if (processor) {
-    //    btxs = bcode.decode(btxs)
-    //    btxs  = await jq.run(processor, btxs)
-    //  }
-    //  console.log('Filtered Xputs = ', btxs.length)
-    //}
 
     console.log('Block ' + block_index + ' : ' + txs.length + 'txs | ' + btxs.length + ' filtered txs')
     return btxs
@@ -128,26 +120,17 @@ const crawl = async function(block_index) {
 const listen = function() {
   let sock = zmq.socket('sub')
   sock.connect('tcp://' + Config.zmq.incoming.host + ':' + Config.zmq.incoming.port)
-  sock.subscribe('hashtx')
-  sock.subscribe('hashblock')
+  //sock.subscribe('hashtx')
+  //sock.subscribe('hashblock')
   sock.subscribe('rawtx')
   sock.subscribe('rawblock')
   console.log('Subscriber connected to port ' + Config.zmq.incoming.port)
 
   // Listen to ZMQ
   sock.on('message', async function(topic, message) {
-    if (topic.toString() === 'hashtx') {
-      let hash = message.toString('hex')
-      console.log('New mempool hash from ZMQ = ', hash)
-      //await sync('mempool', hash)
-    } else if (topic.toString() === 'hashblock') {
-      let hash = message.toString('hex')
-      console.log('New block hash from ZMQ = ', hash)
-      //await sync('block')
-    } else if (topic.toString() === 'rawtx') {
+    if (topic.toString() === 'rawtx') {
       console.log('New rawtx from ZMQ')
-      //TODO: not await
-      await processRawTx(message)
+      await processRawTx(message, confirmed=0)
     } else if (topic.toString() === 'rawblock') {
       console.log('New block from ZMQ')
       await processRawBlock(message)
@@ -157,45 +140,65 @@ const listen = function() {
   // Don't trust ZMQ. Try synchronizing every 1 minute in case ZMQ didn't fire
   setInterval(async function() {
     await sync('block')
-  }, 60000)
+  }, 120000)
 
 }
 
 const isBacktraceTx = function(tx) {
+  // TODO: check the tx
   return true
 }
 
-const processRawTx = async function(rawtx) {
+const processRawTx = async function(rawtx, confirmed=0) {
   let tx = new bsv.Transaction()
   tx.fromBuffer(rawtx)
-  await processTx(tx)
+  if (confirmed == 1) {
+    await processConfirmedTx(tx)
+  } else {
+    await processTx(tx)
+  }
+  return tx.id
 }
 
 const processTx = async function(tx) {
   if (isBacktraceTx(tx)) {
-    //TODO: check the tx
     let jsontx = tx.toJSON()
     //TODO: use hash as the mongo _id, if _id performance will be affected, hash must be unique
     jsontx['_id'] = jsontx['hash']
     delete jsontx['hash']
-    console.log('processTx: jsontx', jsontx)
-    let res = await Db.tx.insert(jsontx)
-    //TODO: handle the failed situation
-    console.log('processTx: insert res:', res)
+    jsontx['confirmed'] = 0 
+    //console.log('processTx: jsontx', jsontx)
+    unconfirmed[tx.id] = 1
+    await Db.tx.insert(jsontx)
+  }
+}
+
+const processConfirmedTx = async function(tx) {
+  if (isBacktraceTx(tx)) {
+    console.log("tx: ", tx.id, unconfirmed)
+    if (unconfirmed[tx.id]) {
+      delete unconfirmed[tx.id] 
+      await db.tx.updateConfirmed(tx.id, 1)
+    } else {
+      let jsontx = tx.toJSON()
+      jsontx['_id'] = jsontx['hash']
+      delete jsontx['hash']
+      jsontx['confirmed'] = 1
+      await Db.tx.insert(jsontx)
+    }
   }
 }
 
 const processRawBlock = async function(rawblock) {
   let block = bsv.Block.fromRawBlock(rawblock)
-  //block.fromBuffer(rawblock)
+  console.log("preocessRawBlock: transaction length:", block.transactions.length, block)
   for (var i = 0; i < block.transactions.length; i++) {
-    await processTx(block.transactions[i])
+    await processConfirmedTx(block.transactions[i])
   }
 }
 
 const sync = async function(type, hash) {
-  //TODO:
-  if (type === 'block11') {
+  if (type === 'block') {
     try {
       const lastSynchronized = Info.checkpoint()
       const currentHeight = await request.height()
@@ -205,29 +208,11 @@ const sync = async function(type, hash) {
       for(let index=lastSynchronized+1; index<=currentHeight; index++) {
         console.log('RPC BEGIN ' + index, new Date().toString())
         console.time('RPC END ' + index)
-        let content = await crawl(index)
+        await crawl(index)
         console.timeEnd('RPC END ' + index)
-        console.log(new Date().toString())
-        console.log('DB BEGIN ' + index, new Date().toString())
-        console.time('DB Insert ' + index)
 
-        await Db.block.insert(content, index)
-
-        await Info.updateTip(index)
-        console.timeEnd('DB Insert ' + index)
-        console.log('------------------------------------------')
-        console.log('\n')
-
-        // zmq broadcast
-        let b = { i: index, txs: content }
-        console.log('Zmq block = ', JSON.stringify(b, null, 2))
-      }
-
-      // clear mempool and synchronize
-      if (lastSynchronized < currentHeight) {
-        console.log('Clear mempool and repopulate')
-        let items = await request.mempool()
-        await Db.mempool.sync(items)
+        await Info.updateHeight(index)
+        console.log('updateHeight:', index)
       }
 
       if (lastSynchronized === currentHeight) {
@@ -239,7 +224,7 @@ const sync = async function(type, hash) {
       }
     } catch (e) {
       console.log('Error', e)
-      console.log('Shutting down Bitdb...', new Date().toString())
+      console.log('Shutting down oracledb...', new Date().toString())
       await Db.exit()
       process.exit()
     }
@@ -265,13 +250,14 @@ const sync = async function(type, hash) {
 }
 const run = async function() {
 
+  // clear all unconfirmed tx
+  await Db.tx.removeAllUnconfirmed()
+
   // initial block sync
   await sync('block')
 
   // initial mempool sync
-  console.log('Clear mempool and repopulate')
-  let items = await request.mempool()
-  await Db.mempool.sync(items)
+  request.mempool()
 }
 module.exports = {
   init: init, crawl: crawl, listen: listen, sync: sync, run: run

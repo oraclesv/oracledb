@@ -6,15 +6,15 @@ module.exports = {
     'pass': 'cc',
     'host': '127.0.0.1',
     'port': '18332',
-    'limit': 15
+    'limit': 30
   },
   'db': {
-    'name': 'bitdb',
+    'name': 'oracledb',
     'url': 'mongodb://localhost:27017',
     'index': {
       'tx': {
         'keys': [
-          'hash'
+          'confirmed'
         ]
       },
       'utxo': {

@@ -5,6 +5,7 @@ var config
 var init = function(_config) {
   config = _config
   return new Promise(function(resolve) {
+    //TODO: deprecated interface, replace with new
     MongoClient.connect(_config.url, {useNewUrlParser: true}, function(err, client) {
       if (err) console.log(err)
       db = client.db(_config.name)
@@ -20,113 +21,61 @@ var exit = function() {
   })
 }
 var tx = {
-  insert: function(item) {
-    return db.collection('tx').insertOne(item)
+  insert: async function(txjson) {
+    try {
+      let res = await db.collection('tx').insertOne(txjson)
+      if (res.result['ok'] == 1) {
+        console.log("insert tx", txjson['_id'], txjson['confirmed'])
+        return true
+      } else {
+        console.error("insert tx failed", txjson['_id'], txjson['confirmed'])
+        return false
+      }
+    } catch(e) {
+      console.error('error:', e)
+      return false
+    }
+  },
+  updateConfirmed: async function(txid, confirmed) {
+    let res = await db.collection('tx').updateOne({'_id': txid}, {'$set': {'confirmed': confirmed}})
+    if (res.result['ok'] != 1) {
+      console.error('updateConfirmed failed res:', res)
+      return false
+    } else {
+      console.log('updateConfirmed: ', txid)
+    }
+    return true
+  },
+  removeAllUnconfirmed: async function() {
+    let res = await db.collection('tx').deleteMany({'confirmed': 0})
+    if (res.result['ok'] != 1) {
+      console.error('removeAllUnconfirmed', res)
+      throw new Error("removeAllUnconfirmed failed")
+    }
   }
 }
 
 var info = {
-  getHeight: function() {
-    res =  db.collection('info').findOne({'_id': 'height'})
-    return res
+  getHeight: async function() {
+    let res = await db.collection('info').findOne({'_id': 'height'})
+    if (res != null) {
+      if (res.value) {
+        return res.value
+      }
+    }
+    return 0
   },
-  updateHeight: function(height) {
-    res = db.collection('info').updateOne({'_id': 'height'}, {'value': height, 'upsert': 1})
+  updateHeight: async function(height) {
+    let res = await db.collection('info').updateOne({'_id': 'height'}, {'$set': {'value': height}}, {'upsert': 1})
+    if (res.result['ok'] != 1) {
+      console.error('updateHeight failed res:', res)
+      return false
+    }
+    return true
   }
 }
 
-var mempool =  {
-  insert: function(item) {
-    return db.collection('unconfirmed').insertMany([item])
-  },
-  reset: async function() {
-    await db.collection('unconfirmed').deleteMany({}).catch(function(err) {
-      console.log('## ERR ', err)
-      process.exit()
-    })
-  },
-  sync: async function(items) {
-    await db.collection('unconfirmed').deleteMany({}).catch(function(err) {
-      console.log('## ERR ', err)
-    })
-    let index = 0
-    while (true) {
-      let chunk = items.splice(0, 1000)
-      if (chunk.length > 0) {
-        await db.collection('unconfirmed').insertMany(chunk, { ordered: false }).catch(function(err) {
-          // duplicates are ok because they will be ignored
-          if (err.code !== 11000) {
-            console.log('## ERR ', err, items)
-            process.exit()
-          }
-        })
-        console.log('..chunk ' + index + ' processed ...', new Date().toString())
-        index++
-      } else {
-        break
-      }
-    }
-    console.log('Mempool synchronized with ' + items.length + ' items')
-  }
-}
 var block = {
-  reset: async function() {
-    await db.collection('confirmed').deleteMany({}).catch(function(err) {
-      console.log('## ERR ', err)
-      process.exit()
-    })
-  },
-  replace: async function(items, block_index) {
-    console.log('Deleting all blocks greater than or equal to', block_index)
-    await db.collection('confirmed').deleteMany({
-      'blk.i': {
-        $gte: block_index
-      }
-    }).catch(function(err) {
-      console.log('## ERR ', err)
-      process.exit()
-    })
-    console.log('Updating block', block_index, 'with', items.length, 'items')
-    let index = 0
-    while (true) {
-      let chunk = items.slice(index, index+1000)
-      if (chunk.length > 0) {
-        await db.collection('confirmed').insertMany(chunk, { ordered: false }).catch(function(err) {
-          // duplicates are ok because they will be ignored
-          if (err.code !== 11000) {
-            console.log('## ERR ', err, items)
-            process.exit()
-          }
-        })
-        console.log('\tchunk ' + index + ' processed ...')
-        index+=1000
-      } else {
-        break
-      }
-    }
-  },
-  insert: async function(items, block_index) {
-    let index = 0
-    while (true) {
-      let chunk = items.slice(index, index+1000)
-      if (chunk.length > 0) {
-        try {
-          await db.collection('confirmed').insertMany(chunk, { ordered: false })
-          console.log('..chunk ' + index + ' processed ...')
-        } catch (e) {
-          // duplicates are ok because they will be ignored
-          if (e.code !== 11000) {
-            console.log('## ERR ', e, items, block_index)
-            process.exit()
-          }
-        }
-        index+=1000
-      } else {
-        break
-      }
-    }
-    console.log('Block ' + block_index + ' inserted ')
-  },
   index: async function() {
     console.log('* Indexing MongoDB...')
     console.time('TotalIndex')
@@ -162,18 +111,12 @@ var block = {
 
     console.log('* Finished indexing MongoDB...')
     console.timeEnd('TotalIndex')
-
-    try {
-      let result = await db.collection('confirmed').indexInformation({full: true})
-      console.log('* Confirmed Index = ', result)
-      result = await db.collection('unconfirmed').indexInformation({full: true})
-      console.log('* Unonfirmed Index = ', result)
-    } catch (e) {
-      console.log('* Error fetching index info ', e)
-      process.exit()
-    }
   }
 }
 module.exports = {
-  init: init, exit: exit, block: block, mempool: mempool, tx: tx
+  init: init, 
+  exit: exit, 
+  block: block, 
+  tx: tx,
+  info: info,
 }

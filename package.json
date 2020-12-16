@@ -1,9 +1,9 @@
 {
-  "name": "bitd",
-  "version": "0.2.1",
-  "description": "decentralized autonomous database over bitcoin",
+  "name": "oracledb",
+  "version": "0.1",
+  "description": "oracle database over bitcoin",
   "main": "index.js",
-  "author": "21 Century Motor Company",
+  "author": "21 Century Motor Company and cc",
   "license": "MIT",
   "scripts": {
     "start": "node index",
@@ -13,13 +13,9 @@
     "bitcoind-rpc": "^0.7.2",
     "bsv": "^1.5.4",
     "dotenv": "^6.0.0",
-    "iconv-lite": "^0.4.24",
-    "ip": "^1.1.5",
     "mongodb": "^3.6",
     "p-limit": "^2.0.0",
     "p-queue": "^3.0.0",
-    "tna": "0.1.2",
-    "traverse": "^0.6.6",
     "zeromq": "^5.2.0"
   },
   "devDependencies": {
