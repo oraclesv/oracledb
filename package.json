@@ -3,7 +3,7 @@
   "version": "0.1",
   "description": "oracle database over bitcoin",
   "main": "index.js",
-  "author": "21 Century Motor Company and cc",
+  "author": "21 Century Motor Company and CC",
   "license": "MIT",
   "scripts": {
     "start": "node index",
@@ -16,6 +16,7 @@
     "mongodb": "^3.6",
     "p-limit": "^2.0.0",
     "p-queue": "^3.0.0",
+    "winston": "^3.3.3",
     "zeromq": "^5.2.0"
   },
   "devDependencies": {

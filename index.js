@@ -4,6 +4,7 @@ const Filter = require('./bitdb.json')
 const Info = require('./info.js')
 const Bit = require('./bit.js')
 const Db = require('./db')
+const log = require('./logger').logger
 
 const daemon = {
   run: async function() {
@@ -14,20 +15,13 @@ const daemon = {
     // 2. Bootstrap actions depending on first time
     let dbheight = await Db.info.getHeight()
     let height = Math.max(dbheight, Info.checkpoint())
-    console.log("height:", dbheight, height)
+    log.info('init dbheight %d, config height %d', dbheight, height)
     await Info.updateHeight(height)
 
-    console.log("init db height:", height)
-
-    console.time('Indexing Keys')
     await Db.block.index()
-    console.timeEnd('Indexing Keys')
 
     // 3. Start synchronizing
-    console.log('Synchronizing...', new Date())
-    console.time('Initial Sync')
     await Bit.run()
-    console.timeEnd('Initial Sync')
 
     // 4. Start listening
     Bit.listen()
@@ -56,15 +50,15 @@ const util = {
     }
   },
   fix: async function(from) {
-    console.log('Restarting from index ', from)
-    console.time('replace')
+    log.info('Restarting from index %s', from)
+    log.info('replace')
     await Bit.init(Db, Info)
     let content = await Bit.crawl(from)
     await Db.block.replace(content, from)
-    console.log('Block', from, 'fixed.')
+    log.info('Block %s from', from)
     await Info.updateHeight(from)
-    console.log('[finished]')
-    console.timeEnd('replace')
+    log.info('[finished]')
+    log.info('replace')
   }
 }
 const start = async function() {

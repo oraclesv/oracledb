@@ -5,6 +5,7 @@ const pQueue = require('p-queue')
 const bsv = require('bsv')
 const Config = require('./config.js')
 const db = require('./db.js')
+const log = require('./logger').logger
 const queue = new pQueue({concurrency: Config.rpc.limit})
 
 var Db
@@ -27,7 +28,7 @@ const request = {
     return new Promise(function(resolve) {
       rpc.getBlockHash(block_index, function(err, res) {
         if (err) {
-          console.log('Err = ', err)
+          log.error('getBlockHash failed: ', err)
           throw new Error(err)
         } else {
           rpc.getBlock(res.result, function(err, block) {
@@ -44,7 +45,7 @@ const request = {
     return new Promise(function(resolve) {
       rpc.getBlockCount(function(err, res) {
         if (err) {
-          console.log('Err = ', err)
+          log.error('get height failed: ', err)
           throw new Error(err)
         } else {
           resolve(res.result)
@@ -56,7 +57,7 @@ const request = {
     return new Promise(function(resolve) {
       rpc.getRawTransaction(hash, function(err, res) {
         if (err) {
-          console.log('Err = ', err)
+          log.error('getRawTransaction failed: ', err)
           throw new Error(err)
         } else {
           resolve(res.result)
@@ -68,16 +69,16 @@ const request = {
     return new Promise(function(resolve) {
       rpc.getRawMemPool(async function(err, ret) {
         if (err) {
-          console.log('Err', err)
+          log.error('getRawMemmPool failed: %s', err)
         } else {
           let tasks = []
           const limit = pLimit(Config.rpc.limit)
           let txs = ret.result
-          console.log('txs = ', txs.length)
+          log.info('txs length: %s', txs.length)
           for(let i=0; i<txs.length; i++) {
             tasks.push(limit(async function() {
               let rawtx = await request.tx(txs[i]).catch(function(e) {
-                console.log('Error = ', e)
+                log.error('getRawTx failed %s', e)
               })
               txid = await processRawTx(rawtx, confirmed=1)
               return txid
@@ -92,18 +93,16 @@ const request = {
 }
 const crawl = async function(block_index) {
   let block_content = await request.block(block_index)
-  //console.log('block_content', block_content)
 
   if (block_content && block_content.result) {
     let txs = block_content.result.tx
-    console.log('crawling txs = ', txs.length)
-    console.log('crawling txs:', txs)
+    log.debug('crawling txs: %s, %s', txs.length, txs)
     let tasks = []
     const limit = pLimit(Config.rpc.limit)
     for(let i = 0; i < txs.length; i++) {
       tasks.push(limit(async function() {
         let rawtx = await request.tx(txs[i]).catch(function(e) {
-          console.log('Error = ', e)
+          log.error('getRawTx failed %s', e)
         })
         txid = await processRawTx(rawtx, confirmed=1)
         return txid
@@ -111,7 +110,6 @@ const crawl = async function(block_index) {
     }
     let btxs = await Promise.all(tasks)
 
-    console.log('Block ' + block_index + ' : ' + txs.length + 'txs | ' + btxs.length + ' filtered txs')
     return btxs
   } else {
     return []
@@ -124,15 +122,15 @@ const listen = function() {
   //sock.subscribe('hashblock')
   sock.subscribe('rawtx')
   sock.subscribe('rawblock')
-  console.log('Subscriber connected to port ' + Config.zmq.incoming.port)
+  log.info('Subscriber connected to port %s', Config.zmq.incoming.port)
 
   // Listen to ZMQ
   sock.on('message', async function(topic, message) {
     if (topic.toString() === 'rawtx') {
-      console.log('New rawtx from ZMQ')
+      log.debug("zmq new rawtx")
       await processRawTx(message, confirmed=0)
     } else if (topic.toString() === 'rawblock') {
-      console.log('New block from ZMQ')
+      log.debug("zmq new rawblock")
       await processRawBlock(message)
     }
   })
@@ -167,7 +165,6 @@ const processTx = async function(tx) {
     jsontx['_id'] = jsontx['hash']
     delete jsontx['hash']
     jsontx['confirmed'] = 0 
-    //console.log('processTx: jsontx', jsontx)
     unconfirmed[tx.id] = 1
     await Db.tx.insert(jsontx)
   }
@@ -175,7 +172,7 @@ const processTx = async function(tx) {
 
 const processConfirmedTx = async function(tx) {
   if (isBacktraceTx(tx)) {
-    console.log("tx: ", tx.id, unconfirmed)
+    log.info("processConfirmedTx: %s, %s", tx.id, unconfirmed[tx.id])
     if (unconfirmed[tx.id]) {
       delete unconfirmed[tx.id] 
       await db.tx.updateConfirmed(tx.id, 1)
@@ -191,7 +188,7 @@ const processConfirmedTx = async function(tx) {
 
 const processRawBlock = async function(rawblock) {
   let block = bsv.Block.fromRawBlock(rawblock)
-  console.log("preocessRawBlock: transaction length:", block.transactions.length, block)
+  log.info("preocessRawBlock: transaction length %s, %s", block.transactions.length, block)
   for (var i = 0; i < block.transactions.length; i++) {
     await processConfirmedTx(block.transactions[i])
   }
@@ -202,45 +199,43 @@ const sync = async function(type, hash) {
     try {
       const lastSynchronized = Info.checkpoint()
       const currentHeight = await request.height()
-      console.log('Last Synchronized = ', lastSynchronized)
-      console.log('Current Height = ', currentHeight)
+      log.info('lastSynchronized %s, bsv curentHeight %s', lastSynchronized, currentHeight)
 
       for(let index=lastSynchronized+1; index<=currentHeight; index++) {
-        console.log('RPC BEGIN ' + index, new Date().toString())
-        console.time('RPC END ' + index)
+        log.info('start crawl new block txs')
         await crawl(index)
-        console.timeEnd('RPC END ' + index)
 
         await Info.updateHeight(index)
-        console.log('updateHeight:', index)
+        log.info('updateHeight: %s', index)
       }
 
       if (lastSynchronized === currentHeight) {
-        console.log('no update')
+        log.info('no need sync block, %s, %s', lastSynchronized, currentHeight)
         return null
       } else {
-        console.log('[finished]')
+        log.info('syn finished]')
         return currentHeight
       }
     } catch (e) {
-      console.log('Error', e)
-      console.log('Shutting down oracledb...', new Date().toString())
+      log.error('sync block failed %s', e)
+      log.error('Shutting down oracledb...')
       await Db.exit()
       process.exit()
     }
   } else if (type === 'mempool') {
+    //TODO:
     queue.add(async function() {
       let content = await request.tx(hash)
       try {
         await Db.mempool.insert(content)
-        console.log('# Q inserted [size: ' + queue.size + ']',  hash)
-        console.log(content)
+        log.info('queue inserted [size: %s], %s', queue.size, hash)
+        log.info(content)
       } catch (e) {
         // duplicates are ok because they will be ignored
         if (e.code == 11000) {
-          console.log('Duplicate mempool item: ', content)
+          log.info('Duplicate mempool item: %s', content)
         } else {
-          console.log('## ERR ', e, content)
+          log.error('## ERR %s, %s', e, content)
           process.exit()
         }
       }

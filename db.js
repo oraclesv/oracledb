@@ -1,4 +1,5 @@
 const MongoClient = require('mongodb').MongoClient
+const log = require('./logger').logger
 var db
 var mongo
 var config
@@ -7,7 +8,7 @@ var init = function(_config) {
   return new Promise(function(resolve) {
     //TODO: deprecated interface, replace with new
     MongoClient.connect(_config.url, {useNewUrlParser: true}, function(err, client) {
-      if (err) console.log(err)
+      if (err) log.error(err)
       db = client.db(_config.name)
       mongo = client
       resolve()
@@ -25,31 +26,31 @@ var tx = {
     try {
       let res = await db.collection('tx').insertOne(txjson)
       if (res.result['ok'] == 1) {
-        console.log("insert tx", txjson['_id'], txjson['confirmed'])
+        log.info("insert txid %s, confirmed %s", txjson['_id'], txjson['confirmed'])
         return true
       } else {
-        console.error("insert tx failed", txjson['_id'], txjson['confirmed'])
+        log.error("insert txid %s, %s failed", txjson['_id'], txjson['confirmed'])
         return false
       }
     } catch(e) {
-      console.error('error:', e)
+      log.error('insert failed: %s', e)
       return false
     }
   },
   updateConfirmed: async function(txid, confirmed) {
     let res = await db.collection('tx').updateOne({'_id': txid}, {'$set': {'confirmed': confirmed}})
     if (res.result['ok'] != 1) {
-      console.error('updateConfirmed failed res:', res)
+      log.error('updateConfirmed failed res: %s', res)
       return false
     } else {
-      console.log('updateConfirmed: ', txid)
+      log.info('updateConfirmed: %s, %s', txid, confirmed)
     }
     return true
   },
   removeAllUnconfirmed: async function() {
     let res = await db.collection('tx').deleteMany({'confirmed': 0})
     if (res.result['ok'] != 1) {
-      console.error('removeAllUnconfirmed', res)
+      log.error('removeAllUnconfirmed %s', res)
       throw new Error("removeAllUnconfirmed failed")
     }
   }
@@ -68,8 +69,10 @@ var info = {
   updateHeight: async function(height) {
     let res = await db.collection('info').updateOne({'_id': 'height'}, {'$set': {'value': height}}, {'upsert': 1})
     if (res.result['ok'] != 1) {
-      console.error('updateHeight failed res:', res)
+      log.error('db.updateHeight failed res: %s', res)
       return false
+    } else {
+      log.info('db.updateHeight: %s', height)
     }
     return true
   }
@@ -77,8 +80,7 @@ var info = {
 
 var block = {
   index: async function() {
-    console.log('* Indexing MongoDB...')
-    console.time('TotalIndex')
+    log.info('index mongodb')
 
     if (config.index) {
       let collectionNames = Object.keys(config.index)
@@ -86,31 +88,22 @@ var block = {
         let collectionName = collectionNames[j]
         let keys = config.index[collectionName].keys
         if (keys) {
-          console.log('Indexing keys...')
           for(let i=0; i<keys.length; i++) {
             let o = {}
             o[keys[i]] = 1
-            console.time('Index:' + keys[i])
             try {
-              if (keys[i] === 'tx.h') {
-                await db.collection(collectionName).createIndex(o, { unique: true })
-                console.log('* Created unique index for ', keys[i])
-              } else {
-                await db.collection(collectionName).createIndex(o)
-                console.log('* Created index for ', keys[i])
-              }
+              await db.collection(collectionName).createIndex(o)
+              log.info('create index %s', keys[i])
             } catch (e) {
-              console.log(e)
+              log.error('create index failed %s', e)
               process.exit()
             }
-            console.timeEnd('Index:' + keys[i])
           }
         }
       }
     }
 
-    console.log('* Finished indexing MongoDB...')
-    console.timeEnd('TotalIndex')
+    log.info('finished indexing mongodb...')
   }
 }
 module.exports = {
