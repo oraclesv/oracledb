@@ -9,6 +9,8 @@ const proto = require('../protoheader')
 
 const tokenType = Buffer.allocUnsafe(4)
 tokenType.writeUInt32LE(1)
+const tokenName = Buffer.alloc(10, 0)
+tokenName.write('tcc')
 const txid = "b145b31e2b1b24103b0fc8f4b9e54953f5b90f9059559dd7612c629897b95820"
 const bsvBalance = 100
 const address = Buffer.from('ce0b4a25ec9a7db3ad28cf824aa624125ea8143d', 'hex')
@@ -43,7 +45,8 @@ describe('token', function() {
     }))
 
     const script = Buffer.concat([
-      genesisFlag, // genesis flag
+      tokenName,
+      genesisFlag, 
       Buffer.alloc(20, 0), // address
       Buffer.alloc(8, 0), // token value
       Buffer.alloc(20, 0), // script code hash
@@ -91,6 +94,7 @@ describe('token', function() {
     const buffValue = Buffer.alloc(8, 0)
     buffValue.writeBigUInt64LE(tokenValue)
     const script = Buffer.concat([
+      tokenName,
       nonGenesisFlag, // genesis flag
       address, // address
       buffValue, // token value
@@ -130,6 +134,7 @@ describe('token', function() {
     const buffValue2 = Buffer.alloc(8, 0)
     buffValue2.writeBigUInt64LE(tokenValue2)
     const script2 = Buffer.concat([
+      tokenName,
       nonGenesisFlag, // genesis flag
       address, // address
       buffValue2, // token value
@@ -147,6 +152,7 @@ describe('token', function() {
     const tokenValue3 = tokenValue - tokenValue2
     buffValue3.writeBigUInt64LE(tokenValue3)
     const script3 = Buffer.concat([
+      tokenName,
       nonGenesisFlag, // genesis flag
       address, // address
       buffValue3, // token value
