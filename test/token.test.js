@@ -11,6 +11,8 @@ const tokenType = Buffer.allocUnsafe(4)
 tokenType.writeUInt32LE(1)
 const txid = "b145b31e2b1b24103b0fc8f4b9e54953f5b90f9059559dd7612c629897b95820"
 
+let curTx
+
 describe('token', function() {
   before(async function() {
     // runs once before the first test in this block
@@ -22,16 +24,12 @@ describe('token', function() {
     await db.exit()
   });
 
-  beforeEach(function() {
+  beforeEach(async function() {
     // runs before each test in this block
   });
 
   afterEach(function() {
     // runs after each test in this block
-  });
-
-  // test cases
-  it('genesis should return success', async function() {
     const bsvBalance = 100
     const tx = new bsv.Transaction()
     tx.addInput(new bsv.Transaction.Input({
@@ -44,7 +42,7 @@ describe('token', function() {
       script: bsv.Script.empty(), // placeholder
     }))
 
-    let script = Buffer.concat([
+    const script = Buffer.concat([
       Buffer.from('01', 'hex'), // genesis flag
       Buffer.alloc(20, 0), // address
       Buffer.alloc(8, 0), // token value
@@ -57,13 +55,17 @@ describe('token', function() {
       satoshis: bsvBalance,
     }))
 
-    let pres = await backtrace.processTx(tx)
+    const pres = await backtrace.processTx(tx)
     assert.strictEqual(pres, true)
+    curTx = tx
+  });
 
+  // test cases
+  it('genesis should return success', async function() {
     // find it in the utxo
-    let res = await db.utxo.remove(tx.id, 0)
+    const res = await db.utxo.remove(curTx.id, 0)
     console.log("remove res:", res)
     assert.strictEqual(res.ok, 1)
-    assert.strictEqual(res.value.txid, tx.id)
+    assert.strictEqual(res.value.txid, curTx.id)
   })
 })
