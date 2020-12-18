@@ -1,8 +1,10 @@
 const MongoClient = require('mongodb').MongoClient
 const log = require('./logger').logger
-let db = null
-let mongo = null
-let config = null
+const { Long } = require('mongodb')
+
+let db
+let mongo
+let config
 let init = function(_config) {
   config = _config
   return new Promise(function(resolve) {
@@ -86,10 +88,12 @@ utxo = {
   // TODO: json data or js object
   insert: async function(data) {
     try {
-      data['_id'] = utxo.genid(data['txid'], data['outputIndex']) 
+      data['_id'] = utxo.genid(data['txid'], data['outputIndex'])
+      const value = data['tokenValue']
+      data['tokenValue'] = new Long(Number(value & 0xFFFFFFFFn), Number((value >> 32n) & 0xFFFFFFFFn))
       const res = await db.collection('utxo').insertOne(data)
       if (res.result['ok'] == 1) {
-        log.info("utxo.insert txid %s, outputIndex %s, tokenID %s", data['txid'], data['outputIndex'])
+        log.info("utxo.insert txid %s, outputIndex %s, tokenID %s", data['txid'], data['outputIndex'], data['tokenID'])
         return true
       } else {
         log.error("utxo.insert txid %s, %s failed", data['txid'], data['outputIndex'])
@@ -107,6 +111,10 @@ utxo = {
       )
     if (res && res.ok == 1) {
       log.debug('db.utxo remove res: %s', res)
+      if (res.value != null) {
+        log.info('db.utxo remove utxo %s', res.value)
+        res.value['tokenValue'] = BigInt(res.value['tokenValue'])
+      }
     } else {
       log.error('db.utxo remove failed res %s', res)
     }

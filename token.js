@@ -1,4 +1,6 @@
 const pLimit = require('p-limit')
+const bsv = require('bsv')
+
 const proto = require('./protoheader')
 const db = require('./db')
 const config = require('./config.js')
@@ -6,6 +8,7 @@ const log = require('./logger').logger
 
 const token = module.exports
 
+const TOKEN_TYPE = 1
 // token specific
 //<type specific data> = <is_genesis(1 byte)> <public key hash(20 bytes)> + <token value(8 bytes)> + <genesis script code hash as tokenid(20 bytes)> + <proto header>
 const TOKEN_ID_LEN = 20
@@ -56,6 +59,7 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
       'tokenID': tokenID,
       'tokenValue': token.getTokenValue(script),
       'isGenesis': isGenesis,
+      'type': TOKEN_TYPE,
     }
     tasks.push(limit(async function() {
       const res = await db.utxo.insert(data)
@@ -89,7 +93,7 @@ token.processTx = async function(tx, validInputs, validOutputs) {
       continue
     }
     if (!outValue[tokenID]) {
-      outValue[tokenID] = 0
+      outValue[tokenID] = BigInt(0)
       tokenIDOutputs[tokenID] = []
     }
     outValue[tokenID] += value
@@ -98,12 +102,14 @@ token.processTx = async function(tx, validInputs, validOutputs) {
 
   // count the input token value
   const inValue = {}
-  for (const input of validInputs) {
-    const script = input.script.toBuffer()
+  for (const inputData of validInputs) {
+    //const input = inputData[0]
+    const script = inputData[1]
+    log.debug('input script: %s, %s', script.length, script.toString('hex'))
     const value = token.getTokenValue(script)
     const tokenID = token.getTokenID(script)
     if (!inValue[tokenID]) {
-      inValue[tokenID] = 0
+      inValue[tokenID] = BigInt(0)
     }
     inValue[tokenID] += value
   }
@@ -122,9 +128,11 @@ token.processTx = async function(tx, validInputs, validOutputs) {
   // check the genesis input
   for (const tokenID of invalidTokenID) {
     // need to check if has genesis token 
-    for (input in validInputs) {
-      const inputScriptHash = Buffer.from(bsv.crypto.Hash.sha256ripemd160(input.scriptHash))
-      if (inputScriptHash.compare(tokenID) == 0) {
+    for (const inputData of validInputs) {
+      const script = inputData[1]
+      log.debug("check input script hash: %s", script.toString('hex'))
+      const inputScriptHash = Buffer.from(bsv.crypto.Hash.sha256ripemd160(script)).toString('hex')
+      if (inputScriptHash == tokenID) {
         token.insertTokenIDOutput(tx.id, tokenID, tokenIDOutputs[tokenID], tasks, limit)
       }
     }
@@ -133,7 +141,7 @@ token.processTx = async function(tx, validInputs, validOutputs) {
   if (tasks.length > 0) {
     flag = true
     const res = await Promise.all(tasks)
-    log.debug('token.processTx insert res:', res)
+    log.debug('token.processTx insert res: %s', res)
   }
 
   return flag

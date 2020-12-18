@@ -72,11 +72,12 @@ async function processTx(tx) {
     log.debug("remove utxo res: %s, input %s, res %s", dbres, input, res)
     if (dbres && dbres.ok == 1 && dbres.value != null) {
       const type = dbres.value['type']
+      log.debug("input value: type %s, %s, %s", type, typeof type, dbres.value)
       if (!validInputs[type]) {
         validInputs[type] = []
       }
-      input.script = dbres.value['script']
-      validInputs[type].push(input)
+      const script = Buffer.from(dbres.value['script'], 'hex')
+      validInputs[type].push([input, script])
     }
   }
 
@@ -107,7 +108,7 @@ async function processTx(tx) {
   // TODO: use tasks concurrency
   for (type in validOutputs) {
     if (supportTypes[type] !== undefined) {
-      const inputs = []
+      let inputs = []
       if (validInputs[type] !== undefined) {
         inputs = validInputs[type]
       }
