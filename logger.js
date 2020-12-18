@@ -1,4 +1,5 @@
 const winston = require('winston') 
+const config = require('./config')
 const { combine, timestamp, label, printf, splat} = winston.format;
 
 const myFormat = printf(({ level, message, label, timestamp }) => {
@@ -6,7 +7,7 @@ const myFormat = printf(({ level, message, label, timestamp }) => {
 });
 
 const logger = winston.createLogger({
-  level: 'debug',
+  level: config.logger.level,
   //format: winston.format.json(),
   format: combine(
     label({ label: 'oracledb' }),

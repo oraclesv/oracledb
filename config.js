@@ -1,6 +1,7 @@
 const ip = require('ip')
 module.exports = {
   'tx_max_concurrency': 100,
+  'sync_height': 0,
   'rpc': {
     'protocol': 'http',
     'user': 'cc',
@@ -34,5 +35,8 @@ module.exports = {
       'host': '127.0.0.1',
       'port': '28000'
     }
+  },
+  'logger': {
+    'level': 'debug'
   }
 }

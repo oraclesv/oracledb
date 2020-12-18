@@ -1,15 +1,12 @@
 const zmq = require('zeromq')
 const RpcClient = require('bitcoind-rpc')
 const pLimit = require('p-limit')
-const pQueue = require('p-queue')
 const bsv = require('bsv')
-const Config = require('./config.js')
+const config = require('./config.js')
 const db = require('./db.js')
 const log = require('./logger').logger
 const backtrace = require('./backtrace')
-//const queue = new pQueue({concurrency: Config.rpc.max_concurrency})
 
-var Db
 var Info
 var rpc
 
@@ -17,10 +14,9 @@ let unconfirmed = {}
 
 const init = function(db, info) {
   return new Promise(function(resolve) {
-    Db = db
     Info = info
 
-    rpc = new RpcClient(Config.rpc)
+    rpc = new RpcClient(config.rpc)
     resolve()
   })
 }
@@ -73,7 +69,7 @@ const request = {
           log.error('getRawMemmPool failed: %s', err)
         } else {
           let tasks = []
-          const limit = pLimit(Config.rpc.max_concurrency)
+          const limit = pLimit(config.rpc.max_concurrency)
           let txs = ret.result
           log.info('getRawMemPool: txs length: %s', txs.length)
           for(let i=0; i<txs.length; i++) {
@@ -99,7 +95,7 @@ const crawl = async function(block_index) {
     let txs = block_content.result.tx
     log.debug('crawling txs: %s, %s', txs.length, txs)
     let tasks = []
-    const limit = pLimit(Config.rpc.max_concurrency)
+    const limit = pLimit(config.rpc.max_concurrency)
     for(let i = 0; i < txs.length; i++) {
       tasks.push(limit(async function() {
         let rawtx = await request.tx(txs[i]).catch(function(e) {
@@ -118,12 +114,12 @@ const crawl = async function(block_index) {
 }
 const listen = function() {
   let sock = zmq.socket('sub')
-  sock.connect('tcp://' + Config.zmq.incoming.host + ':' + Config.zmq.incoming.port)
+  sock.connect('tcp://' + config.zmq.incoming.host + ':' + config.zmq.incoming.port)
   //sock.subscribe('hashtx')
   //sock.subscribe('hashblock')
   sock.subscribe('rawtx')
   sock.subscribe('rawblock')
-  log.info('Subscriber connected to port %s', Config.zmq.incoming.port)
+  log.info('Subscriber connected to port %s', config.zmq.incoming.port)
 
   // Listen to ZMQ
   sock.on('message', async function(topic, message) {
@@ -164,7 +160,7 @@ const processTx = async function(tx) {
     delete jsontx['hash']
     jsontx['confirmed'] = 0 
     unconfirmed[tx.id] = 1
-    await Db.tx.insert(jsontx)
+    await db.tx.insert(jsontx)
   }
 }
 
@@ -182,7 +178,7 @@ const processConfirmedTx = async function(tx) {
       jsontx['_id'] = jsontx['hash']
       delete jsontx['hash']
       jsontx['confirmed'] = 1
-      await Db.tx.insert(jsontx)
+      await db.tx.insert(jsontx)
     }
   }
 }
@@ -192,7 +188,7 @@ const processRawBlock = async function(rawblock) {
   log.info("preocessRawBlock: transaction length %s, %s", block.transactions.length, block)
   let tasks = []
   // use the db concurrency
-  let limit = pLimit(Config.tx_max_concurrency)
+  let limit = pLimit(config.tx_max_concurrency)
   for (var i = 0; i < block.transactions.length; i++) {
     task.push(limit(async function() {
       await processConfirmedTx(block.transactions[i])
@@ -216,7 +212,6 @@ const syncBlock = async function() {
     }
 
     if (lastSynchronized === currentHeight) {
-      log.info('no need sync block, %s, %s', lastSynchronized, currentHeight)
       return null
     } else {
       log.info('syn finished')
@@ -225,14 +220,14 @@ const syncBlock = async function() {
   } catch (e) {
     log.error('sync block failed %s, %s', e, e.stack)
     log.error('Shutting down oracledb...')
-    await Db.exit()
+    await db.exit()
     process.exit()
   }
 }
 const run = async function() {
 
   // clear all unconfirmed tx
-  await Db.tx.removeAllUnconfirmed()
+  await db.tx.removeAllUnconfirmed()
 
   // initial block sync
   await syncBlock()

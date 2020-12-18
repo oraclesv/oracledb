@@ -1,17 +1,16 @@
-const Filter = require('./bitdb.json')
-const Db = require('./db')
-const log = require('./logger').logger
+const db = require('./db')
+const config = require('./config')
 /**
 * Return the last synchronized checkpoint
 */
 
-let height = Filter.from
+let height = config.sync_height
 
 const checkpoint = function() {
   return height
 }
 const updateHeight = async function(index) {
-  await Db.info.updateHeight(index)
+  await db.info.updateHeight(index)
   height = index
 }
 module.exports = {

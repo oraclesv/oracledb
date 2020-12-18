@@ -1,36 +1,39 @@
 const log = require('./logger').logger
 const pLimit = require('p-limit')
-const Config = require('./config.js')
-const Token = require('./token')
-const Proto = require('./protoheader')
+const config = require('./config.js')
+const token = require('./token')
+const proto = require('./protoheader')
 const db = require('./db')
 
 const TOKEN_TYPE = 1
 
-const supportTypes = {
-  TOKEN_TYPE: Token,
-}
+const supportTypes = {}
+supportTypes[TOKEN_TYPE] = token
 
 // script: buffer type
 function isValidHeader(script) {
   let len = script.length
 
   // check flag and type 
-  if (len < Proto.getHeaderLen()) {
+  if (len < proto.getHeaderLen()) {
+    log.debug('isValidHeader: failed len %s', len)
     return false
   }
 
-  if (Proto.HasProtoFlag(script)) {
+  if (!proto.HasProtoFlag(script)) {
+    log.debug('isValidHeader: failed proto flag %s, %s, %s', proto.getFlag(script).toString(), proto.PROTO_FLAG.toString(), proto.getFlag(script).compare(proto.PROTO_FLAG))
     return false
   }
 
-  let type = Proto.getHeaderType(script)
+  let type = proto.getHeaderType(script)
 
   if (supportTypes[type] === undefined) {
+    log.debug('isValidHeader: failed supportTypes %s, %s', type, supportTypes)
     return false
   }
 
   if (len < supportTypes[type].getHeaderLen()) {
+    log.debug('isValidHeader: failed data len %s, %s', len, supportTypes[type].getHeaderLen())
     return false
   }
 
@@ -40,12 +43,12 @@ function isValidHeader(script) {
 // if tx is backtrace type, return true else false
 async function processTx(tx) {
   log.debug("backtrace.processTx: %s", tx.id)
-  let validInputs = {}
-  let validOutputs = {}
+  let validInputs = new Map()
+  let validOutputs = new Map()
   let isBacktraceTx = false
 
   let tasks = []
-  const limit = pLimit(Config.db.max_concurrency)
+  const limit = pLimit(config.db.max_concurrency)
   for (let i = 0; i < tx.inputs.length; i++) {
     let input = tx.inputs[i]
     tasks.push(limit(async function() {
@@ -63,7 +66,6 @@ async function processTx(tx) {
   }
 
   let results = await Promise.all(tasks)
-  log.debug('remove task results %s', results)
   for (const res of results) {
     let dbres = res[0]
     let input = res[1]
@@ -81,15 +83,18 @@ async function processTx(tx) {
   for (let i = 0; i < tx.outputs.length; i++) {
     let output = tx.outputs[i]
     let script = output.script.toBuffer()
+    log.debug('script %s, is valid %s', script.toString('hex'), isValidHeader(script))
     if (isValidHeader(script)) {
-      let type = getHeaderType(script)
-      if (!validOutputs) {
+      let type = proto.getHeaderType(script)
+      log.debug('output type %s, %s', type, typeof type)
+      if (validOutputs[type] === undefined) {
         validOutputs[type] = []
       }
       validOutputs[type].push([i, output])
     }
   }
 
+  log.debug('backtrace.processTx: validOutputs %s, validInputs %s', validOutputs, validInputs)
   if (validOutputs.length <= 0 && validInputs.length <= 0) {
     return false
   } 
@@ -99,7 +104,7 @@ async function processTx(tx) {
   }
 
   // handle all type tx
-  // TODO: usr tasks concurrency
+  // TODO: use tasks concurrency
   for (type in validOutputs) {
     if (supportTypes[type] !== undefined) {
       let inputs = []

@@ -1,24 +1,22 @@
-require('dotenv').config()
-const Config = require('./config.js')
-const Filter = require('./bitdb.json')
+const config = require('./config.js')
 const Info = require('./info.js')
 const Bit = require('./bit.js')
-const Db = require('./db')
+const db = require('./db')
 const log = require('./logger').logger
 
 const daemon = {
   run: async function() {
     // 1. Initialize
-    await Db.init(Config.db)
-    await Bit.init(Db, Info)
+    await db.init(config.db)
+    await Bit.init(db, Info)
 
     // 2. Bootstrap actions depending on first time
-    let dbheight = await Db.info.getHeight()
+    let dbheight = await db.info.getHeight()
     let height = Math.max(dbheight, Info.checkpoint())
     log.info('init dbheight %d, config height %d', dbheight, height)
     await Info.updateHeight(height)
 
-    await Db.block.index()
+    await db.block.index()
 
     // 3. Start synchronizing
     await Bit.run()
@@ -29,7 +27,7 @@ const daemon = {
 }
 const util = {
   run: async function() {
-    await Db.init(Config.db)
+    await db.init(config.db)
     let cmd = process.argv[2]
     if (cmd === 'fix') {
       let from
@@ -41,20 +39,20 @@ const util = {
       await util.fix(from)
       process.exit()
     } else if (cmd === 'reset') {
-      await Db.block.reset()
-      await Db.mempool.reset()
+      await db.block.reset()
+      await db.mempool.reset()
       process.exit()
     } else if (cmd === 'index') {
-      await Db.block.index()
+      await db.block.index()
       process.exit()
     }
   },
   fix: async function(from) {
     log.info('Restarting from index %s', from)
     log.info('replace')
-    await Bit.init(Db, Info)
+    await Bit.init(db, Info)
     let content = await Bit.crawl(from)
-    await Db.block.replace(content, from)
+    await db.block.replace(content, from)
     log.info('Block %s from', from)
     await Info.updateHeight(from)
     log.info('[finished]')

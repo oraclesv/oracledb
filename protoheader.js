@@ -22,5 +22,8 @@ Proto.getHeaderType = function (script) {
 
 Proto.HasProtoFlag = function (script) {
   let flag = Proto.getFlag(script)
-  return flag.compare(Proto.PROTO_FLAG) == 0
+  if (flag.compare(Proto.PROTO_FLAG) == 0) {
+    return true
+  }
+  return false
 }
