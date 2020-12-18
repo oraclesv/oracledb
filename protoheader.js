@@ -1,5 +1,5 @@
 
-var Proto = module.exports
+const Proto = module.exports
 
 Proto.PROTO_FLAG = Buffer.from('backtrace')
 
@@ -21,7 +21,7 @@ Proto.getHeaderType = function (script) {
 }
 
 Proto.HasProtoFlag = function (script) {
-  let flag = Proto.getFlag(script)
+  const flag = Proto.getFlag(script)
   if (flag.compare(Proto.PROTO_FLAG) == 0) {
     return true
   }

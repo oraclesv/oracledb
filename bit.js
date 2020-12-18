@@ -7,10 +7,10 @@ const db = require('./db.js')
 const log = require('./logger').logger
 const backtrace = require('./backtrace')
 
-var Info
-var rpc
+let Info
+let rpc
 
-let unconfirmed = {}
+const unconfirmed = {}
 
 const init = function(db, info) {
   return new Promise(function(resolve) {
@@ -189,7 +189,7 @@ const processRawBlock = async function(rawblock) {
   let tasks = []
   // use the db concurrency
   let limit = pLimit(config.tx_max_concurrency)
-  for (var i = 0; i < block.transactions.length; i++) {
+  for (let i = 0; i < block.transactions.length; i++) {
     task.push(limit(async function() {
       await processConfirmedTx(block.transactions[i])
     }))

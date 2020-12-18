@@ -4,7 +4,7 @@ const db = require('./db')
 const config = require('./config.js')
 const log = require('./logger').logger
 
-var token = module.exports
+const token = module.exports
 
 // token specific
 //<type specific data> = <is_genesis(1 byte)> <public key hash(20 bytes)> + <token value(8 bytes)> + <genesis script code hash as tokenid(20 bytes)> + <proto header>
@@ -66,19 +66,19 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
 
 token.processTx = async function(tx, validInputs, validOutputs) {
   log.debug('token.processTx: tx %s, validInputs %s, validOutputs %s', tx, validInputs, validOutputs)
-  let outValue = {}
-  let tokenIDOutputs = {}
+  const outValue = {}
+  const tokenIDOutputs = {}
   let flag = false
 
-  let tasks = []
+  const tasks = []
   const limit = pLimit(config.db.max_concurrency)
   // count the output token value
   for (const outputData of validOutputs) {
-    let output = outputData[1]
-    let script = output.script.toBuffer()
-    let value = token.getTokenValue(script)
-    let tokenID = token.getTokenID(script)
-    let isGenesis = token.getGenesisFlag(script)
+    const output = outputData[1]
+    const script = output.script.toBuffer()
+    const value = token.getTokenValue(script)
+    const tokenID = token.getTokenID(script)
+    const isGenesis = token.getGenesisFlag(script)
     log.debug('token.processTx: output value %s, tokenID %s, isGenesis %s', value, tokenID, isGenesis)
     if (isGenesis == 1) {
       // genesis tx data limit
@@ -97,11 +97,11 @@ token.processTx = async function(tx, validInputs, validOutputs) {
   }
 
   // count the input token value
-  let inValue = {}
+  const inValue = {}
   for (const input of validInputs) {
-    let script = input.script.toBuffer()
-    let value = token.getTokenValue(script)
-    let tokenID = token.getTokenID(script)
+    const script = input.script.toBuffer()
+    const value = token.getTokenValue(script)
+    const tokenID = token.getTokenID(script)
     if (!inValue[tokenID]) {
       inValue[tokenID] = 0
     }
@@ -109,7 +109,7 @@ token.processTx = async function(tx, validInputs, validOutputs) {
   }
 
   // compare token input and output
-  let invalidTokenID = []
+  const invalidTokenID = []
   for (tokenID in outValue) {
     if (outValue[tokenID] != inValue[tokenID]) {
       invalidTokenID.push(tokenID)
@@ -122,10 +122,9 @@ token.processTx = async function(tx, validInputs, validOutputs) {
   // check the genesis input
   for (const tokenID of invalidTokenID) {
     // need to check if has genesis token 
-    let scriptHash = tokenID
     for (input in validInputs) {
-      let inputScriptHash = Buffer.from(bsv.crypto.Hash.sha256ripemd160(input.scriptHash))
-      if (inputScriptHash.compare(scriptHash) == 0) {
+      const inputScriptHash = Buffer.from(bsv.crypto.Hash.sha256ripemd160(input.scriptHash))
+      if (inputScriptHash.compare(tokenID) == 0) {
         token.insertTokenIDOutput(tx.id, tokenID, tokenIDOutputs[tokenID], tasks, limit)
       }
     }
@@ -133,7 +132,7 @@ token.processTx = async function(tx, validInputs, validOutputs) {
 
   if (tasks.length > 0) {
     flag = true
-    let res = await Promise.all(tasks)
+    const res = await Promise.all(tasks)
     log.debug('token.processTx insert res:', res)
   }
 

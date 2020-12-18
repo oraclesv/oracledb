@@ -1,9 +1,9 @@
 const MongoClient = require('mongodb').MongoClient
 const log = require('./logger').logger
-var db
-var mongo
-var config
-var init = function(_config) {
+let db = null
+let mongo = null
+let config = null
+let init = function(_config) {
   config = _config
   return new Promise(function(resolve) {
     MongoClient.connect(_config.url, {useNewUrlParser: true, useUnifiedTopology: true}, function(err, client) {
@@ -14,16 +14,16 @@ var init = function(_config) {
     })
   })
 }
-var exit = function() {
+let exit = function() {
   return new Promise(function(resolve) {
     mongo.close()
     resolve()
   })
 }
-var tx = {
+let tx = {
   insert: async function(txjson) {
     try {
-      let res = await db.collection('tx').insertOne(txjson)
+      const res = await db.collection('tx').insertOne(txjson)
       if (res.result['ok'] == 1) {
         log.info("insert txid %s, confirmed %s", txjson['_id'], txjson['confirmed'])
         return true
@@ -37,7 +37,7 @@ var tx = {
     }
   },
   updateConfirmed: async function(txid, confirmed) {
-    let res = await db.collection('tx').updateOne({'_id': txid}, {'$set': {'confirmed': confirmed}})
+    const res = await db.collection('tx').updateOne({'_id': txid}, {'$set': {'confirmed': confirmed}})
     if (res.result['ok'] != 1) {
       log.error('updateConfirmed failed res: %s', res)
       return false
@@ -47,7 +47,7 @@ var tx = {
     return true
   },
   removeAllUnconfirmed: async function() {
-    let res = await db.collection('tx').deleteMany({'confirmed': 0})
+    const res = await db.collection('tx').deleteMany({'confirmed': 0})
     if (res.result['ok'] != 1) {
       log.error('removeAllUnconfirmed %s', res)
       throw new Error("removeAllUnconfirmed failed")
@@ -55,9 +55,9 @@ var tx = {
   }
 }
 
-var info = {
+let info = {
   getHeight: async function() {
-    let res = await db.collection('info').findOne({'_id': 'height'})
+    const res = await db.collection('info').findOne({'_id': 'height'})
     if (res != null) {
       if (res.value) {
         return res.value
@@ -66,7 +66,7 @@ var info = {
     return 0
   },
   updateHeight: async function(height) {
-    let res = await db.collection('info').updateOne({'_id': 'height'}, {'$set': {'value': height}}, {'upsert': 1})
+    const res = await db.collection('info').updateOne({'_id': 'height'}, {'$set': {'value': height}}, {'upsert': 1})
     if (res.result['ok'] != 1) {
       log.error('db.updateHeight failed res: %s', res)
       return false
@@ -77,7 +77,7 @@ var info = {
   }
 }
 
-var utxo
+let utxo
 utxo = {
   genid: function(txid, outputIndex) {
     return txid + '-' + outputIndex
@@ -87,7 +87,7 @@ utxo = {
   insert: async function(data) {
     try {
       data['_id'] = utxo.genid(data['txid'], data['outputIndex']) 
-      let res = await db.collection('utxo').insertOne(data)
+      const res = await db.collection('utxo').insertOne(data)
       if (res.result['ok'] == 1) {
         log.info("utxo.insert txid %s, outputIndex %s, tokenID %s", data['txid'], data['outputIndex'])
         return true
@@ -101,8 +101,8 @@ utxo = {
     }
   },
   remove: async function(txid, outputIndex) {
-    let id = utxo.genid(txid, outputIndex)
-    let res = await db.collection('utxo').findOneAndDelete(
+    const id = utxo.genid(txid, outputIndex)
+    const res = await db.collection('utxo').findOneAndDelete(
       filter = {'_id': id},
       )
     if (res && res.ok == 1) {
@@ -114,15 +114,15 @@ utxo = {
   }
 }
 
-var block = {
+let block = {
   index: async function() {
     log.info('index mongodb')
 
     if (config.index) {
-      let collectionNames = Object.keys(config.index)
+      const collectionNames = Object.keys(config.index)
       for(let j=0; j<collectionNames.length; j++) {
-        let collectionName = collectionNames[j]
-        let keys = config.index[collectionName].keys
+        const collectionName = collectionNames[j]
+        const keys = config.index[collectionName].keys
         if (keys) {
           for(let i=0; i<keys.length; i++) {
             let o = {}

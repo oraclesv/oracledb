@@ -12,7 +12,7 @@ supportTypes[TOKEN_TYPE] = token
 
 // script: buffer type
 function isValidHeader(script) {
-  let len = script.length
+  const len = script.length
 
   // check flag and type 
   if (len < proto.getHeaderLen()) {
@@ -25,7 +25,7 @@ function isValidHeader(script) {
     return false
   }
 
-  let type = proto.getHeaderType(script)
+  const type = proto.getHeaderType(script)
 
   if (supportTypes[type] === undefined) {
     log.debug('isValidHeader: failed supportTypes %s, %s', type, supportTypes)
@@ -43,21 +43,21 @@ function isValidHeader(script) {
 // if tx is backtrace type, return true else false
 async function processTx(tx) {
   log.debug("backtrace.processTx: %s", tx.id)
-  let validInputs = new Map()
-  let validOutputs = new Map()
+  const validInputs = new Map()
+  const validOutputs = new Map()
   let isBacktraceTx = false
 
-  let tasks = []
+  const tasks = []
   const limit = pLimit(config.db.max_concurrency)
   for (let i = 0; i < tx.inputs.length; i++) {
-    let input = tx.inputs[i]
+    const input = tx.inputs[i]
     tasks.push(limit(async function() {
       // try to remove spend tx
       // TODO: posible performance bottleneck, every tx's input will try to write db, if we can get the lock script of input, we can avoid this
       log.debug('txjson %s', tx.toJSON())
       log.debug('backtrace.processTx: try remove utxo %s', input)
       if (input.prevTxId !== undefined) {
-        let res = await db.utxo.remove(input.prevTxId.toString('hex'), input.outputIndex)
+        const res = await db.utxo.remove(input.prevTxId.toString('hex'), input.outputIndex)
         return [res, input]
       } else {
         return [null, null]
@@ -65,13 +65,13 @@ async function processTx(tx) {
     }))
   }
 
-  let results = await Promise.all(tasks)
+  const results = await Promise.all(tasks)
   for (const res of results) {
-    let dbres = res[0]
-    let input = res[1]
+    const dbres = res[0]
+    const input = res[1]
     log.debug("remove utxo res: %s, input %s, res %s", dbres, input, res)
     if (dbres && dbres.ok == 1 && dbres.value != null) {
-      let type = dbres.value['type']
+      const type = dbres.value['type']
       if (!validInputs[type]) {
         validInputs[type] = []
       }
@@ -81,11 +81,11 @@ async function processTx(tx) {
   }
 
   for (let i = 0; i < tx.outputs.length; i++) {
-    let output = tx.outputs[i]
-    let script = output.script.toBuffer()
+    const output = tx.outputs[i]
+    const script = output.script.toBuffer()
     log.debug('script %s, is valid %s', script.toString('hex'), isValidHeader(script))
     if (isValidHeader(script)) {
-      let type = proto.getHeaderType(script)
+      const type = proto.getHeaderType(script)
       log.debug('output type %s, %s', type, typeof type)
       if (validOutputs[type] === undefined) {
         validOutputs[type] = []
@@ -107,11 +107,11 @@ async function processTx(tx) {
   // TODO: use tasks concurrency
   for (type in validOutputs) {
     if (supportTypes[type] !== undefined) {
-      let inputs = []
+      const inputs = []
       if (validInputs[type] !== undefined) {
         inputs = validInputs[type]
       }
-      let res = await supportTypes[type].processTx(tx, inputs, validOutputs[type])
+      const res = await supportTypes[type].processTx(tx, inputs, validOutputs[type])
       if (res == true) {
         isBacktraceTx = true
       }
