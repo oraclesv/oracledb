@@ -6,8 +6,7 @@ var config
 var init = function(_config) {
   config = _config
   return new Promise(function(resolve) {
-    //TODO: deprecated interface, replace with new
-    MongoClient.connect(_config.url, {useNewUrlParser: true}, function(err, client) {
+    MongoClient.connect(_config.url, {useNewUrlParser: true, useUnifiedTopology: true}, function(err, client) {
       if (err) log.error(err)
       db = client.db(_config.name)
       mongo = client
@@ -78,6 +77,43 @@ var info = {
   }
 }
 
+var utxo
+utxo = {
+  genid: function(txid, outputIndex) {
+    return txid + '-' + outputIndex
+  },
+  // _id, txid, outputIndex, scriptcode, value, tokenid
+  // TODO: json data or js object
+  insert: async function(data) {
+    try {
+      data['_id'] = utxo.genid(data['txid'], data['outputIndex']) 
+      let res = await db.collection('utxo').insertOne(data)
+      if (res.result['ok'] == 1) {
+        log.info("utxo.insert txid %s, outputIndex %s, tokenID %s", data['txid'], data['outputIndex'])
+        return true
+      } else {
+        log.error("utxo.insert txid %s, %s failed", data['txid'], data['outputIndex'])
+        return false
+      }
+    } catch(e) {
+      log.error('utxo.insert failed: %s', e)
+      return false
+    }
+  },
+  remove: async function(txid, outputIndex) {
+    let id = utxo.genid(txid, outputIndex)
+    let res = await db.collection('utxo').findOneAndDelete(
+      filter = {'_id': id},
+      )
+    if (res && res.ok == 1) {
+      log.debug('db.utxo remove res: %s', res)
+    } else {
+      log.error('db.utxo remove failed res %s', res)
+    }
+    return res
+  }
+}
+
 var block = {
   index: async function() {
     log.info('index mongodb')
@@ -112,4 +148,5 @@ module.exports = {
   block: block, 
   tx: tx,
   info: info,
+  utxo: utxo,
 }

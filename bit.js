@@ -6,7 +6,8 @@ const bsv = require('bsv')
 const Config = require('./config.js')
 const db = require('./db.js')
 const log = require('./logger').logger
-const queue = new pQueue({concurrency: Config.rpc.limit})
+const backtrace = require('./backtrace')
+//const queue = new pQueue({concurrency: Config.rpc.max_concurrency})
 
 var Db
 var Info
@@ -72,9 +73,9 @@ const request = {
           log.error('getRawMemmPool failed: %s', err)
         } else {
           let tasks = []
-          const limit = pLimit(Config.rpc.limit)
+          const limit = pLimit(Config.rpc.max_concurrency)
           let txs = ret.result
-          log.info('txs length: %s', txs.length)
+          log.info('getRawMemPool: txs length: %s', txs.length)
           for(let i=0; i<txs.length; i++) {
             tasks.push(limit(async function() {
               let rawtx = await request.tx(txs[i]).catch(function(e) {
@@ -98,7 +99,7 @@ const crawl = async function(block_index) {
     let txs = block_content.result.tx
     log.debug('crawling txs: %s, %s', txs.length, txs)
     let tasks = []
-    const limit = pLimit(Config.rpc.limit)
+    const limit = pLimit(Config.rpc.max_concurrency)
     for(let i = 0; i < txs.length; i++) {
       tasks.push(limit(async function() {
         let rawtx = await request.tx(txs[i]).catch(function(e) {
@@ -137,14 +138,9 @@ const listen = function() {
 
   // Don't trust ZMQ. Try synchronizing every 1 minute in case ZMQ didn't fire
   setInterval(async function() {
-    await sync('block')
+    await syncBlock()
   }, 120000)
 
-}
-
-const isBacktraceTx = function(tx) {
-  // TODO: check the tx
-  return true
 }
 
 const processRawTx = async function(rawtx, confirmed=0) {
@@ -159,9 +155,11 @@ const processRawTx = async function(rawtx, confirmed=0) {
 }
 
 const processTx = async function(tx) {
-  if (isBacktraceTx(tx)) {
+  let res = await backtrace.processTx(tx)
+  unconfirmed[tx.id] = res
+  if (res) {
+    log.info('processTx: new backtrace tx: %s', tx.id)
     let jsontx = tx.toJSON()
-    //TODO: use hash as the mongo _id, if _id performance will be affected, hash must be unique
     jsontx['_id'] = jsontx['hash']
     delete jsontx['hash']
     jsontx['confirmed'] = 0 
@@ -171,12 +169,15 @@ const processTx = async function(tx) {
 }
 
 const processConfirmedTx = async function(tx) {
-  if (isBacktraceTx(tx)) {
-    log.info("processConfirmedTx: %s, %s", tx.id, unconfirmed[tx.id])
-    if (unconfirmed[tx.id]) {
-      delete unconfirmed[tx.id] 
+  if (unconfirmed[tx.id] !== undefined) {
+    if (unconfirmed[tx.id] == true) {
       await db.tx.updateConfirmed(tx.id, 1)
-    } else {
+    }
+    delete unconfirmed[tx.id]
+  } else {
+    let res = await backtrace.processTx(tx)
+    if (res) {
+      log.info('processConfirmedTx: new backtrace tx:', tx.id)
       let jsontx = tx.toJSON()
       jsontx['_id'] = jsontx['hash']
       delete jsontx['hash']
@@ -189,58 +190,43 @@ const processConfirmedTx = async function(tx) {
 const processRawBlock = async function(rawblock) {
   let block = bsv.Block.fromRawBlock(rawblock)
   log.info("preocessRawBlock: transaction length %s, %s", block.transactions.length, block)
+  let tasks = []
+  // use the db concurrency
+  let limit = pLimit(Config.tx_max_concurrency)
   for (var i = 0; i < block.transactions.length; i++) {
-    await processConfirmedTx(block.transactions[i])
+    task.push(limit(async function() {
+      await processConfirmedTx(block.transactions[i])
+    }))
   }
+  await Promise.all(tasks)
 }
 
-const sync = async function(type, hash) {
-  if (type === 'block') {
-    try {
-      const lastSynchronized = Info.checkpoint()
-      const currentHeight = await request.height()
-      log.info('lastSynchronized %s, bsv curentHeight %s', lastSynchronized, currentHeight)
+const syncBlock = async function() {
+  try {
+    const lastSynchronized = Info.checkpoint()
+    const currentHeight = await request.height()
+    log.info('lastSynchronized %s, bsv curentHeight %s', lastSynchronized, currentHeight)
 
-      for(let index=lastSynchronized+1; index<=currentHeight; index++) {
-        log.info('start crawl new block txs')
-        await crawl(index)
+    for(let index=lastSynchronized+1; index<=currentHeight; index++) {
+      log.info('start crawl new block txs')
+      await crawl(index)
 
-        await Info.updateHeight(index)
-        log.info('updateHeight: %s', index)
-      }
-
-      if (lastSynchronized === currentHeight) {
-        log.info('no need sync block, %s, %s', lastSynchronized, currentHeight)
-        return null
-      } else {
-        log.info('syn finished]')
-        return currentHeight
-      }
-    } catch (e) {
-      log.error('sync block failed %s', e)
-      log.error('Shutting down oracledb...')
-      await Db.exit()
-      process.exit()
+      await Info.updateHeight(index)
+      log.info('updateHeight: %s', index)
     }
-  } else if (type === 'mempool') {
-    //TODO:
-    queue.add(async function() {
-      let content = await request.tx(hash)
-      try {
-        await Db.mempool.insert(content)
-        log.info('queue inserted [size: %s], %s', queue.size, hash)
-        log.info(content)
-      } catch (e) {
-        // duplicates are ok because they will be ignored
-        if (e.code == 11000) {
-          log.info('Duplicate mempool item: %s', content)
-        } else {
-          log.error('## ERR %s, %s', e, content)
-          process.exit()
-        }
-      }
-    })
-    return hash
+
+    if (lastSynchronized === currentHeight) {
+      log.info('no need sync block, %s, %s', lastSynchronized, currentHeight)
+      return null
+    } else {
+      log.info('syn finished')
+      return currentHeight
+    }
+  } catch (e) {
+    log.error('sync block failed %s, %s', e, e.stack)
+    log.error('Shutting down oracledb...')
+    await Db.exit()
+    process.exit()
   }
 }
 const run = async function() {
@@ -249,11 +235,13 @@ const run = async function() {
   await Db.tx.removeAllUnconfirmed()
 
   // initial block sync
-  await sync('block')
+  await syncBlock()
 
   // initial mempool sync
   request.mempool()
 }
 module.exports = {
-  init: init, crawl: crawl, listen: listen, sync: sync, run: run
+  init: init, 
+  listen: listen, 
+  run: run
 }

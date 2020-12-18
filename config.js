@@ -1,16 +1,18 @@
 const ip = require('ip')
 module.exports = {
+  'tx_max_concurrency': 100,
   'rpc': {
     'protocol': 'http',
     'user': 'cc',
     'pass': 'cc',
     'host': '127.0.0.1',
     'port': '18332',
-    'limit': 30
+    'max_concurrency': 30
   },
   'db': {
     'name': 'oracledb',
     'url': 'mongodb://localhost:27017',
+    'max_concurrency': 30,
     'index': {
       'tx': {
         'keys': [
@@ -19,8 +21,10 @@ module.exports = {
       },
       'utxo': {
         'keys': [
-          'tokenid',
+          'tokenID',
           'txid',
+          'address',
+          //(address, tokenID)
         ]
       }
     }
