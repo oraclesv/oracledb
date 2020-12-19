@@ -57,7 +57,7 @@ async function processTx(tx) {
       log.debug('txjson %s', tx.toJSON())
       log.debug('backtrace.processTx: try remove utxo %s', input)
       if (input.prevTxId !== undefined) {
-        const res = await db.utxo.remove(input.prevTxId.toString('hex'), input.outputIndex)
+        const res = await db.utxo.remove(input.prevTxId, input.outputIndex)
         return [res, input]
       } else {
         return [null, null]
@@ -70,13 +70,13 @@ async function processTx(tx) {
     const dbres = res[0]
     const input = res[1]
     log.debug("remove utxo res: %s, input %s, res %s", dbres, input, res)
-    if (dbres && dbres.ok == 1 && dbres.value != null) {
-      const type = dbres.value['type']
-      log.debug("input value: type %s, %s, %s", type, typeof type, dbres.value)
+    if (dbres !== null) {
+      const type = dbres['type']
+      log.debug("input value: type %s, %s, %s", type, typeof type, dbres)
       if (!validInputs[type]) {
         validInputs[type] = []
       }
-      const script = Buffer.from(dbres.value['script'], 'hex')
+      const script = dbres['script']
       validInputs[type].push([input, script])
     }
   }
@@ -113,7 +113,7 @@ async function processTx(tx) {
         inputs = validInputs[type]
       }
       const res = await supportTypes[type].processTx(tx, inputs, validOutputs[type])
-      if (res == true) {
+      if (res === true) {
         isBacktraceTx = true
       }
     }

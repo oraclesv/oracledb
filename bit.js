@@ -142,7 +142,7 @@ const listen = function() {
 const processRawTx = async function(rawtx, confirmed=0) {
   let tx = new bsv.Transaction()
   tx.fromBuffer(rawtx)
-  if (confirmed == 1) {
+  if (confirmed === 1) {
     await processConfirmedTx(tx)
   } else {
     await processTx(tx)
@@ -166,7 +166,7 @@ const processTx = async function(tx) {
 
 const processConfirmedTx = async function(tx) {
   if (unconfirmed[tx.id] !== undefined) {
-    if (unconfirmed[tx.id] == true) {
+    if (unconfirmed[tx.id] === true) {
       await db.tx.updateConfirmed(tx.id, 1)
     }
     delete unconfirmed[tx.id]

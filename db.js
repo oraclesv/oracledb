@@ -1,6 +1,6 @@
 const MongoClient = require('mongodb').MongoClient
 const log = require('./logger').logger
-const { Long } = require('mongodb')
+const { Long, Binary } = require('mongodb')
 
 let db
 let mongo
@@ -26,7 +26,7 @@ let tx = {
   insert: async function(txjson) {
     try {
       const res = await db.collection('tx').insertOne(txjson)
-      if (res.result['ok'] == 1) {
+      if (res.result['ok'] === 1) {
         log.info("insert txid %s, confirmed %s", txjson['_id'], txjson['confirmed'])
         return true
       } else {
@@ -40,7 +40,7 @@ let tx = {
   },
   updateConfirmed: async function(txid, confirmed) {
     const res = await db.collection('tx').updateOne({'_id': txid}, {'$set': {'confirmed': confirmed}})
-    if (res.result['ok'] != 1) {
+    if (res.result['ok'] !== 1) {
       log.error('updateConfirmed failed res: %s', res)
       return false
     } else {
@@ -50,7 +50,7 @@ let tx = {
   },
   removeAllUnconfirmed: async function() {
     const res = await db.collection('tx').deleteMany({'confirmed': 0})
-    if (res.result['ok'] != 1) {
+    if (res.result['ok'] !== 1) {
       log.error('removeAllUnconfirmed %s', res)
       throw new Error("removeAllUnconfirmed failed")
     }
@@ -60,7 +60,7 @@ let tx = {
 let info = {
   getHeight: async function() {
     const res = await db.collection('info').findOne({'_id': 'height'})
-    if (res != null) {
+    if (res !== null) {
       if (res.value) {
         return res.value
       }
@@ -69,7 +69,7 @@ let info = {
   },
   updateHeight: async function(height) {
     const res = await db.collection('info').updateOne({'_id': 'height'}, {'$set': {'value': height}}, {'upsert': 1})
-    if (res.result['ok'] != 1) {
+    if (res.result['ok'] !== 1) {
       log.error('db.updateHeight failed res: %s', res)
       return false
     } else {
@@ -82,21 +82,25 @@ let info = {
 let utxo
 utxo = {
   genid: function(txid, outputIndex) {
-    return txid + '-' + outputIndex
+    const bvalue = Buffer.alloc(4)
+    bvalue.writeUInt32LE(outputIndex)
+    return Binary(Buffer.concat([Buffer.from(txid, 'hex'), bvalue]))
   },
-  // _id, txid, outputIndex, scriptcode, value, tokenid
-  // TODO: json data or js object
   insert: async function(data) {
     try {
       data['_id'] = utxo.genid(data['txid'], data['outputIndex'])
+      data['txid'] = Binary(Buffer.from(data['txid'], 'hex'))
       const value = data['tokenValue']
       data['tokenValue'] = new Long(Number(value & 0xFFFFFFFFn), Number((value >> 32n) & 0xFFFFFFFFn))
+      data['tokenID'] = Binary(data['tokenID'])
+      data['address'] = Binary(data['address'])
+      data['script'] = Binary(data['script'])
       const res = await db.collection('utxo').insertOne(data)
-      if (res.result['ok'] == 1) {
-        log.info("utxo.insert txid %s, outputIndex %s, tokenID %s", data['txid'], data['outputIndex'], data['tokenID'])
+      if (res.result['ok'] === 1) {
+        log.info("utxo.insert txid %s, outputIndex %s, tokenID %s", data['txid'].toString('hex'), data['outputIndex'], data['tokenID'].toString('hex'))
         return true
       } else {
-        log.error("utxo.insert txid %s, %s failed", data['txid'], data['outputIndex'])
+        log.error("utxo.insert txid %s, %s failed", data['txid'].toString('hex'), data['outputIndex'])
         return false
       }
     } catch(e) {
@@ -109,16 +113,24 @@ utxo = {
     const res = await db.collection('utxo').findOneAndDelete(
       filter = {'_id': id},
       )
-    if (res && res.ok == 1) {
+    if (res && res.ok === 1) {
       log.debug('db.utxo remove res: %s', res)
-      if (res.value != null) {
+      let value = null
+      if (res.value !== null) {
         log.info('db.utxo remove utxo %s', res.value)
-        res.value['tokenValue'] = BigInt(res.value['tokenValue'])
+        value = res.value
+        value['tokenValue'] = BigInt(value['tokenValue'])
+        log.debug("remove value: %s, %s, %s", typeof value['txid'], typeof value['tokenID'], typeof value['address'])
+        value['txid'] = value['txid'].read(0, value['txid'].length())
+        value['tokenID'] = value['tokenID'].read(0, value['tokenID'].length())
+        value['address'] = value['address'].read(0, value['address'].length())
+        value['script'] = value['script'].read(0, value['script'].length())
       }
+      return value
     } else {
       log.error('db.utxo remove failed res %s', res)
+      return null 
     }
-    return res
   }
 }
 

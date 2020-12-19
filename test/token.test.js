@@ -71,9 +71,9 @@ describe('token', function() {
   it('genesis should return success', async function() {
     // find it in the utxo
     const res = await db.utxo.remove(curTx.id, 0)
-    console.log("remove res:", res.value)
-    assert.strictEqual(res.ok, 1)
-    assert.strictEqual(res.value.txid, curTx.id)
+    console.log("remove res:", res)
+    assert.notStrictEqual(res, null)
+    assert.strictEqual(res.txid.toString('hex'), curTx.id)
   });
 
   it('genesis should generate new token', async function() {
@@ -115,8 +115,8 @@ describe('token', function() {
 
     //const res = await db.utxo.remove(curTx.id, 0)
     //console.log("remove res:", res)
-    //assert.strictEqual(res.ok, 1)
-    //assert.strictEqual(res.value.txid, curTx.id)
+    //assert.notStrictEqual(res, null)
+    //assert.strictEqual(res.txid.toString('hex'), curTx.id)
 
     // token transfer
     const tx2 = new bsv.Transaction()
@@ -171,13 +171,13 @@ describe('token', function() {
     curTx = tx2
 
     const res2 = await db.utxo.remove(curTx.id, 0)
-    assert.strictEqual(res2.ok, 1)
-    assert.strictEqual(res2.value.txid, curTx.id)
-    assert.strictEqual(res2.value.tokenValue, tokenValue2)
+    assert.notStrictEqual(res2, null)
+    assert.strictEqual(res2.txid.toString('hex'), curTx.id)
+    assert.strictEqual(res2.tokenValue, tokenValue2)
 
     const res3 = await db.utxo.remove(curTx.id, 1)
-    assert.strictEqual(res3.ok, 1)
-    assert.strictEqual(res3.value.txid, curTx.id)
-    assert.strictEqual(res3.value.tokenValue, tokenValue3)
+    assert.notStrictEqual(res3, null)
+    assert.strictEqual(res3.txid.toString('hex'), curTx.id)
+    assert.strictEqual(res3.tokenValue, tokenValue3)
   })
 })

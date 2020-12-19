@@ -23,7 +23,7 @@ const GENESIS_FLAG_OFFSET = TOKEN_ADDRESS_OFFSET + GENESIS_FLAG_LEN
 const TOKEN_NAME_OFFSET = GENESIS_FLAG_OFFSET + TOKEN_NAME_LEN 
 const TOKEN_HEADER_LEN = TOKEN_NAME_OFFSET
 
-const GENESIS_TOKEN_ID = Buffer.alloc(TOKEN_ID_LEN, 0).toString('hex')
+const GENESIS_TOKEN_ID = Buffer.alloc(TOKEN_ID_LEN, 0)
 
 token.getHeaderLen = function() {
   return TOKEN_HEADER_LEN
@@ -34,11 +34,11 @@ token.getTokenValue = function(script) {
 }
 
 token.getTokenID = function(script) {
-  return script.subarray(script.length - TOKEN_ID_OFFSET, script.length - TOKEN_ID_OFFSET + TOKEN_ID_LEN).toString('hex');
+  return script.subarray(script.length - TOKEN_ID_OFFSET, script.length - TOKEN_ID_OFFSET + TOKEN_ID_LEN);
 }
 
 token.getTokenAddress = function(script) {
-  return script.subarray(script.length - TOKEN_ADDRESS_OFFSET, script.length - TOKEN_ADDRESS_OFFSET + TOKEN_ADDRESS_LEN).toString('hex');
+  return script.subarray(script.length - TOKEN_ADDRESS_OFFSET, script.length - TOKEN_ADDRESS_OFFSET + TOKEN_ADDRESS_LEN);
 }
 
 token.getGenesisFlag = function(script) {
@@ -50,7 +50,7 @@ token.getTokenName = function(script) {
 }
 
 token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
-  log.debug('insertTokenIDOutput: txid %s, tokenID %s, outputs %s', txid, tokenID, outputs)
+  log.debug('insertTokenIDOutput: txid %s, tokenID %s, outputs %s', txid, tokenID.toString('hex'), outputs)
   for (const outputData of outputs) {
     const outputIndex = outputData[0]
     const output = outputData[1]
@@ -60,7 +60,7 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
     const data = {
       'txid': txid,
       'outputIndex': outputIndex,
-      'script': script.toString('hex'),
+      'script': script,
       'address': token.getTokenAddress(script),
       'tokenID': tokenID,
       'tokenValue': token.getTokenValue(script),
@@ -89,22 +89,23 @@ token.processTx = async function(tx, validInputs, validOutputs) {
     const script = output.script.toBuffer()
     const value = token.getTokenValue(script)
     const tokenID = token.getTokenID(script)
+    const tokenIDHex = tokenID.toString('hex')
     const isGenesis = token.getGenesisFlag(script)
-    log.debug('token.processTx: output value %s, tokenID %s, isGenesis %s', value, tokenID, isGenesis)
-    if (isGenesis == 1) {
+    log.debug('token.processTx: output value %s, tokenID %s, isGenesis %s', value, tokenIDHex, isGenesis)
+    if (isGenesis === 1) {
       // genesis tx data limit
       log.debug('token.processTx: check genesis args: %s, %s', outputData[0], outputData[1])
-      if (value == 0 && tokenID == GENESIS_TOKEN_ID) {
+      if (value === BigInt(0) && tokenID.compare(GENESIS_TOKEN_ID) === 0) {
         token.insertTokenIDOutput(tx.id, tokenID, [outputData], tasks, limit)
       }
       continue
     }
-    if (!outValue[tokenID]) {
-      outValue[tokenID] = BigInt(0)
-      tokenIDOutputs[tokenID] = []
+    if (!outValue[tokenIDHex]) {
+      outValue[tokenIDHex] = BigInt(0)
+      tokenIDOutputs[tokenIDHex] = []
     }
-    outValue[tokenID] += value
-    tokenIDOutputs[tokenID].push(outputData)
+    outValue[tokenIDHex] += value
+    tokenIDOutputs[tokenIDHex].push(outputData)
   }
 
   // count the input token value
@@ -115,32 +116,33 @@ token.processTx = async function(tx, validInputs, validOutputs) {
     log.debug('input script: %s, %s', script.length, script.toString('hex'))
     const value = token.getTokenValue(script)
     const tokenID = token.getTokenID(script)
-    if (!inValue[tokenID]) {
-      inValue[tokenID] = BigInt(0)
+    const tokenIDHex = tokenID.toString('hex')
+    if (inValue[tokenIDHex] === undefined) {
+      inValue[tokenIDHex] = BigInt(0)
     }
-    inValue[tokenID] += value
+    inValue[tokenIDHex] += value
   }
 
   // compare token input and output
   const invalidTokenID = []
-  for (tokenID in outValue) {
-    if (outValue[tokenID] != inValue[tokenID]) {
-      invalidTokenID.push(tokenID)
-      log.warn("token.processTx invalidTokenID %s, txid %s", tokenID, tx.id)
+  for (const tokenIDHex in outValue) {
+    if (outValue[tokenIDHex] !== inValue[tokenIDHex]) {
+      invalidTokenID.push(tokenIDHex)
+      log.warn("token.processTx invalidTokenID %s, txid %s, outvalue %s, invalue %s", tokenIDHex, tx.id, outValue[tokenIDHex], inValue[tokenIDHex])
     } else {
-      token.insertTokenIDOutput(tx.id, tokenID, tokenIDOutputs[tokenID], tasks, limit)
+      token.insertTokenIDOutput(tx.id, Buffer.from(tokenIDHex, 'hex'), tokenIDOutputs[tokenIDHex], tasks, limit)
     }
   }
 
   // check the genesis input
-  for (const tokenID of invalidTokenID) {
+  for (const tokenIDHex of invalidTokenID) {
     // need to check if has genesis token 
     for (const inputData of validInputs) {
       const script = inputData[1]
-      log.debug("check input script hash: %s", script.toString('hex'))
-      const inputScriptHash = Buffer.from(bsv.crypto.Hash.sha256ripemd160(script)).toString('hex')
-      if (inputScriptHash == tokenID) {
-        token.insertTokenIDOutput(tx.id, tokenID, tokenIDOutputs[tokenID], tasks, limit)
+      const inputScriptHash = Buffer.from(bsv.crypto.Hash.sha256ripemd160(script))
+      log.debug("check input script hash: %s, tokenID %s", inputScriptHash.toString('hex'), tokenIDHex)
+      if (inputScriptHash.toString('hex') === tokenIDHex) {
+        token.insertTokenIDOutput(tx.id, Buffer.from(tokenIDHex, 'hex'), tokenIDOutputs[tokenIDHex], tasks, limit)
       }
     }
   }
