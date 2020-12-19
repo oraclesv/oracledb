@@ -117,14 +117,13 @@ utxo = {
       log.debug('db.utxo remove res: %s', res)
       let value = null
       if (res.value !== null) {
-        log.info('db.utxo remove utxo %s', res.value)
         value = res.value
         value['tokenValue'] = BigInt(value['tokenValue'])
-        log.debug("remove value: %s, %s, %s", typeof value['txid'], typeof value['tokenID'], typeof value['address'])
         value['txid'] = value['txid'].read(0, value['txid'].length())
         value['tokenID'] = value['tokenID'].read(0, value['tokenID'].length())
         value['address'] = value['address'].read(0, value['address'].length())
         value['script'] = value['script'].read(0, value['script'].length())
+        log.info('db.utxo remove utxo txid %s, outputIndex %s, address %s, tokenID %s, tokenValue %s, type %s, isGenesis %s', value.txid.toString('hex'), value.outputIndex, value.address.toString('hex'), value.tokenID.toString('hex'), value.tokenValue, value.type, value.isGenesis)
       }
       return value
     } else {
