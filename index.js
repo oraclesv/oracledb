@@ -16,7 +16,7 @@ const daemon = {
     log.info('init dbheight %d, config height %d', dbheight, height)
     await Info.updateHeight(height)
 
-    await db.block.index()
+    await db.createIndex()
 
     // 3. Start synchronizing
     await Bit.run()
@@ -43,7 +43,7 @@ const util = {
       await db.mempool.reset()
       process.exit()
     } else if (cmd === 'index') {
-      await db.block.index()
+      await db.createIndex()
       process.exit()
     }
   },

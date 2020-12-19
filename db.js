@@ -134,39 +134,36 @@ utxo = {
   }
 }
 
-let block = {
-  index: async function() {
-    log.info('index mongodb')
+let createIndex = async function() {
+  log.info('index mongodb')
 
-    if (config.index) {
-      const collectionNames = Object.keys(config.index)
-      for(let j=0; j<collectionNames.length; j++) {
-        const collectionName = collectionNames[j]
-        const keys = config.index[collectionName].keys
-        if (keys) {
-          for(let i=0; i<keys.length; i++) {
-            let o = {}
-            o[keys[i]] = 1
-            try {
-              await db.collection(collectionName).createIndex(o)
-              log.info('create index %s', keys[i])
-            } catch (e) {
-              log.error('create index failed %s', e)
-              process.exit()
-            }
+  if (config.index) {
+    const collectionNames = Object.keys(config.index)
+    for(let j=0; j<collectionNames.length; j++) {
+      const collectionName = collectionNames[j]
+      const keys = config.index[collectionName].keys
+      if (keys) {
+        for(let i=0; i<keys.length; i++) {
+          try {
+            const res = await db.collection(collectionName).createIndex(keys[i])
+            log.info('create index %s, res %s', keys[i], res)
+          } catch (e) {
+            log.error('create index failed %s', e)
+            process.exit()
           }
         }
       }
     }
-
-    log.info('finished indexing mongodb...')
   }
+
+  log.info('finished indexing mongodb...')
 }
+
 module.exports = {
   init: init, 
   exit: exit, 
-  block: block, 
   tx: tx,
   info: info,
   utxo: utxo,
+  createIndex: createIndex,
 }

@@ -1,4 +1,3 @@
-const ip = require('ip')
 module.exports = {
   'tx_max_concurrency': 100,
   'sync_height': 0,
@@ -17,15 +16,15 @@ module.exports = {
     'index': {
       'tx': {
         'keys': [
-          'confirmed'
+          {'confirmed': 1}
         ]
       },
       'utxo': {
         'keys': [
-          'tokenID',
-          'txid',
-          'address',
-          //(address, tokenID)
+          {'tokenID': 1},
+          {'txid': 1},
+          {'address': 1},
+          {'address': 1, 'tokenID': 1},
         ]
       }
     }
@@ -37,6 +36,6 @@ module.exports = {
     }
   },
   'logger': {
-    'level': 'debug'
+    'level': 'info'
   }
 }
