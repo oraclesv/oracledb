@@ -1,13 +1,12 @@
-const ip = require('ip')
 module.exports = {
   'tx_max_concurrency': 100,
-  'sync_height': 0,
+  'sync_height': 666226,
   'rpc': {
     'protocol': 'http',
-    'user': 'cc',
-    'pass': 'cc',
+    'user': 'bitcoin',
+    'pass': 'bitcoin',
     'host': '127.0.0.1',
-    'port': '18332',
+    'port': '9876',
     'max_concurrency': 30
   },
   'db': {
@@ -33,10 +32,10 @@ module.exports = {
   'zmq': {
     'incoming': {
       'host': '127.0.0.1',
-      'port': '28000'
+      'port': '29000'
     }
   },
   'logger': {
-    'level': 'debug'
+    'level': 'info'
   }
 }
