@@ -4,6 +4,7 @@ const bsv = require('bsv')
 const db = require('../db')
 const backtrace = require('../backtrace')
 const proto = require('../protoheader')
+const cache = require('../cache')
 
 // first case: genesis tx
 
@@ -32,6 +33,8 @@ describe('token', function() {
   });
 
   beforeEach(async function() {
+    await db.utxo.clear()
+    cache.clear()
     // runs before each test in this block
     const tx = new bsv.Transaction()
     tx.addInput(new bsv.Transaction.Input({
@@ -61,6 +64,9 @@ describe('token', function() {
     const pres = await backtrace.processTx(tx)
     assert.strictEqual(pres, true)
     curTx = tx
+
+    console.log("cache: ", cache.data(), tx.id, typeof tx.id, cache.hasUtxo(tx.id, 0))
+    assert.strictEqual(cache.hasUtxo(tx.id, 0), true)
   });
 
   afterEach(function() {
@@ -110,6 +116,7 @@ describe('token', function() {
 
     const pres = await backtrace.processTx(tx)
     assert.strictEqual(pres, true)
+    assert.strictEqual(cache.hasUtxo(curTx.id, 0), false)
 
     curTx = tx
 
@@ -167,8 +174,11 @@ describe('token', function() {
 
     const pres2 = await backtrace.processTx(tx2)
     assert.strictEqual(pres2, true)
+    assert.strictEqual(cache.hasUtxo(curTx.id, 0), false)
 
     curTx = tx2
+    assert.strictEqual(cache.hasUtxo(curTx.id, 0), true)
+    assert.strictEqual(cache.hasUtxo(curTx.id, 1), true)
 
     const res2 = await db.utxo.remove(curTx.id, 0)
     assert.notStrictEqual(res2, null)

@@ -6,6 +6,7 @@ const config = require('./config.js')
 const db = require('./db.js')
 const log = require('./logger').logger
 const backtrace = require('./backtrace')
+const cache = require('./cache')
 
 let Info
 let rpc
@@ -184,10 +185,11 @@ const processConfirmedTx = async function(tx) {
 }
 
 const processRawBlock = async function(rawblock) {
+  // TODO: big block performance
   let block = bsv.Block.fromRawBlock(rawblock)
   log.info("preocessRawBlock: transaction length %s, %s", block.transactions.length, block)
   let tasks = []
-  // use the db concurrency
+  // use concurrency
   let limit = pLimit(config.tx_max_concurrency)
   for (let i = 0; i < block.transactions.length; i++) {
     task.push(limit(async function() {
@@ -224,7 +226,19 @@ const syncBlock = async function() {
     process.exit()
   }
 }
+
+const syncUtxoCache = async function() {
+  await db.utxo.forEach(function(myDoc) {
+    const txid = myDoc.txid.read(0, myDoc.txid.length()).toString('hex')
+    const outputIndex = myDoc.outputIndex
+    cache.addUtxo(txid, outputIndex)
+    log.debug('syncUtxoCache: add utxo id %s, index %s', txid, outputIndex)
+  })
+}
+
 const run = async function() {
+
+  await syncUtxoCache()
 
   // clear all unconfirmed tx
   await db.tx.removeAllUnconfirmed()

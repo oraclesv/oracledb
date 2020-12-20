@@ -4,6 +4,7 @@ const config = require('./config.js')
 const token = require('./token')
 const proto = require('./protoheader')
 const db = require('./db')
+const cache = require('./cache')
 
 const TOKEN_TYPE = 1
 
@@ -40,6 +41,10 @@ function isValidHeader(script) {
   return true
 }
 
+function genUtxoID(txid, outputIndex) {
+  return txid + outputIndex
+}
+
 // if tx is backtrace type, return true else false
 async function processTx(tx) {
   log.debug("backtrace.processTx: %s", tx.id)
@@ -51,9 +56,14 @@ async function processTx(tx) {
   const limit = pLimit(config.db.max_concurrency)
   for (let i = 0; i < tx.inputs.length; i++) {
     const input = tx.inputs[i]
+    const prevTxIdHex = input.prevTxId.toString('hex')
+    // first check the cache
+    if (cache.delUtxo(prevTxIdHex, input.outputIndex) === false) {
+      log.debug('input tx not in cache %s, %s', prevTxIdHex, input.outputIndex)
+      continue
+    }
+
     tasks.push(limit(async function() {
-      // try to remove spend tx
-      // TODO: posible performance bottleneck, every tx's input will try to write db, if we can get the lock script of input, we can avoid this
       log.debug('txjson %s', tx.toJSON())
       log.debug('backtrace.processTx: try remove utxo %s', input)
       if (input.prevTxId !== undefined) {

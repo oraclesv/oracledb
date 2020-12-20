@@ -82,6 +82,7 @@ let info = {
 let utxo
 utxo = {
   genid: function(txid, outputIndex) {
+    log.debug('utxo.genid: type txid %s', typeof txid)
     const bvalue = Buffer.alloc(4)
     bvalue.writeUInt32LE(outputIndex)
     return Binary(Buffer.concat([Buffer.from(txid, 'hex'), bvalue]))
@@ -130,6 +131,14 @@ utxo = {
       log.error('db.utxo remove failed res %s', res)
       return null 
     }
+  },
+  forEach: async function(callback) {
+    await db.collection('utxo').find().forEach(function(myDoc) {
+      callback(myDoc)
+    })
+  },
+  clear: async function() {
+    await db.collection('utxo').deleteMany({})
   }
 }
 

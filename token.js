@@ -5,6 +5,7 @@ const proto = require('./protoheader')
 const db = require('./db')
 const config = require('./config.js')
 const log = require('./logger').logger
+const cache = require('./cache')
 
 const token = module.exports
 
@@ -70,7 +71,7 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
     }
     tasks.push(limit(async function() {
       const res = await db.utxo.insert(data)
-      return res
+      return [res, txid, outputIndex]
     }))
   }
 }
@@ -151,6 +152,15 @@ token.processTx = async function(tx, validInputs, validOutputs) {
     flag = true
     const res = await Promise.all(tasks)
     log.debug('token.processTx insert res: %s', res)
+    for (const item of res) {
+      const succ = item[0]
+      const txid = item[1]
+      const index = item[2]
+      if (succ === true) {
+        cache.addUtxo(txid, index, 1)
+      }
+      log.debug("add cache: %s, %s, %s", succ, txid, index)
+    }
   }
 
   return flag
