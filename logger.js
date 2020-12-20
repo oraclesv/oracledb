@@ -5,6 +5,17 @@ const { combine, timestamp, label, printf, splat} = winston.format;
 const myFormat = printf(({ level, message, label, timestamp }) => {
   return `${timestamp} [${label}] ${level}: ${message}`;
 });
+    
+const DailyRotateFile = require('winston-daily-rotate-file');
+
+const transport = new winston.transports.DailyRotateFile({
+  filename: 'oracledb-%DATE%.log',
+  datePattern: 'YYYY-MM-DD-HH',
+  zippedArchive: true,
+  frequency: '24h',
+  //maxSize: '200m',
+  maxFiles: '30d'
+});
 
 const logger = winston.createLogger({
   level: config.logger.level,
@@ -22,8 +33,9 @@ const logger = winston.createLogger({
     // - Write all logs with level `info` and below to `combined.log`
     //
     new winston.transports.Console(),
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' }),
+    transport,
+    //new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    //new winston.transports.File({ filename: 'combined.log' }),
   ],
 });
 
