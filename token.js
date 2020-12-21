@@ -25,6 +25,7 @@ const TOKEN_NAME_OFFSET = GENESIS_FLAG_OFFSET + TOKEN_NAME_LEN
 const TOKEN_HEADER_LEN = TOKEN_NAME_OFFSET
 
 const GENESIS_TOKEN_ID = Buffer.alloc(TOKEN_ID_LEN, 0)
+const EMPTY_ADDRESS = Buffer.alloc(ADDRESS_LEN, 0)
 
 token.getHeaderLen = function() {
   return TOKEN_HEADER_LEN
@@ -92,11 +93,12 @@ token.processTx = async function(tx, validInputs, validOutputs) {
     const tokenID = token.getTokenID(script)
     const tokenIDHex = tokenID.toString('hex')
     const isGenesis = token.getGenesisFlag(script)
+    const address = token.getTokenAddress(script)
     log.debug('token.processTx: output value %s, tokenID %s, isGenesis %s', value, tokenIDHex, isGenesis)
     if (isGenesis === 1) {
       // genesis tx data limit
       log.debug('token.processTx: check genesis args: %s, %s', outputData[0], outputData[1])
-      if (value === BigInt(0) && tokenID.compare(GENESIS_TOKEN_ID) === 0) {
+      if (value === BigInt(0) && tokenID.compare(GENESIS_TOKEN_ID) === 0 && address.compare(EMPTY_ADDRESS) === 0) {
         token.insertTokenIDOutput(tx.id, tokenID, [outputData], tasks, limit)
       }
       continue
