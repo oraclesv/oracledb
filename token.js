@@ -25,7 +25,7 @@ const TOKEN_NAME_OFFSET = GENESIS_FLAG_OFFSET + TOKEN_NAME_LEN
 const TOKEN_HEADER_LEN = TOKEN_NAME_OFFSET
 
 const GENESIS_TOKEN_ID = Buffer.alloc(TOKEN_ID_LEN, 0)
-const EMPTY_ADDRESS = Buffer.alloc(ADDRESS_LEN, 0)
+const EMPTY_ADDRESS = Buffer.alloc(TOKEN_ADDRESS_LEN, 0)
 
 token.getHeaderLen = function() {
   return TOKEN_HEADER_LEN
