@@ -181,7 +181,7 @@ const listen = function() {
   //sock.subscribe('hashtx')
   //sock.subscribe('hashblock')
   sock.subscribe('rawtx')
-  sock.subscribe('rawblock')
+  //sock.subscribe('rawblock')
   log.info('Subscriber connected to port %s', config.zmq.incoming.port)
 
   // Listen to ZMQ
@@ -189,10 +189,10 @@ const listen = function() {
     if (topic.toString() === 'rawtx') {
       log.debug("zmq new rawtx")
       await processRawTx(message, confirmed=0)
-    } else if (topic.toString() === 'rawblock') {
+    } /*else if (topic.toString() === 'rawblock') {
       log.debug("zmq new rawblock")
       await processRawBlock(message)
-    }
+    }*/
   })
 
   // Don't trust ZMQ. Try synchronizing every 1 minute in case ZMQ didn't fire
@@ -247,7 +247,7 @@ const processConfirmedTx = async function(tx) {
   }
 }
 
-const processRawBlock = async function(rawblock) {
+/*const processRawBlock = async function(rawblock) {
   // TODO: big block performance
   let block = bsv.Block.fromRawBlock(rawblock)
   log.info("processRawBlock: transaction length %s, %s", block.transactions.length, block)
@@ -260,7 +260,7 @@ const processRawBlock = async function(rawblock) {
     }))
   }
   await Promise.all(tasks)
-}
+}*/
 
 const syncBlock = async function() {
   try {
