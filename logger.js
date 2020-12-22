@@ -2,6 +2,8 @@ const winston = require('winston')
 const config = require('./config')
 const { combine, timestamp, label, printf, splat} = winston.format;
 
+// TODO: locale time
+const dateFormat = new Date().toLocaleString()
 const myFormat = printf(({ level, message, label, timestamp }) => {
   return `${timestamp} [${label}] ${level}: ${message}`;
 });
@@ -22,7 +24,7 @@ const logger = winston.createLogger({
   //format: winston.format.json(),
   format: combine(
     label({ label: 'oracledb' }),
-    timestamp(),
+    timestamp(dateFormat),
     splat(),
     myFormat
   ),
@@ -34,7 +36,7 @@ const logger = winston.createLogger({
     //
     new winston.transports.Console(),
     transport,
-    //new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
     //new winston.transports.File({ filename: 'combined.log' }),
   ],
 });
