@@ -269,7 +269,7 @@ const syncBlock = async function() {
     log.info('lastSynchronized %s, bsv curentHeight %s', lastSynchronized, currentHeight)
 
     for(let index=lastSynchronized+1; index<=currentHeight; index++) {
-      log.info('start crawl new block txs')
+      log.info('start crawl new block txs index %s', index)
       await crawl(index)
 
       await Info.updateHeight(index)
