@@ -15,8 +15,6 @@ let rpc
 
 const unconfirmed = {}
 
-//TODO: rpc need timeout
-
 const init = function(db, info) {
   return new Promise(function(resolve) {
     Info = info
@@ -179,7 +177,7 @@ const listen = function() {
   let sock = zmq.socket('sub')
   sock.connect('tcp://' + config.zmq.incoming.host + ':' + config.zmq.incoming.port)
   //sock.subscribe('hashtx')
-  //sock.subscribe('hashblock')
+  sock.subscribe('hashblock')
   sock.subscribe('rawtx')
   //sock.subscribe('rawblock')
   log.info('Subscriber connected to port %s', config.zmq.incoming.port)
@@ -189,13 +187,13 @@ const listen = function() {
     if (topic.toString() === 'rawtx') {
       log.debug("zmq new rawtx")
       await processRawTx(message, confirmed=0)
-    } /*else if (topic.toString() === 'rawblock') {
-      log.debug("zmq new rawblock")
-      await processRawBlock(message)
-    }*/
+    } else if (topic.toString() === 'hashblock') {
+      log.info("zmq new hashblock %s", message)
+      await syncBlock()
+    }
   })
 
-  // Don't trust ZMQ. Try synchronizing every 1 minute in case ZMQ didn't fire
+  // Don't trust ZMQ. Try synchronizing every 2 minute in case ZMQ didn't fire
   setInterval(async function() {
     await syncBlock()
   }, 120000)
