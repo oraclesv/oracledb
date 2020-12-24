@@ -45,12 +45,12 @@ function genUtxoID(txid, outputIndex) {
   return txid + outputIndex
 }
 
-// if tx is backtrace type, return true else false
+// if tx is oracle type, return true else false
 async function processTx(tx) {
-  log.debug("backtrace.processTx: %s", tx.id)
+  log.debug("oracle.processTx: %s", tx.id)
   const validInputs = new Map()
   const validOutputs = new Map()
-  let isBacktraceTx = false
+  let isOracleTx = false
 
   const tasks = []
   const limit = pLimit(config.db.max_concurrency)
@@ -65,7 +65,7 @@ async function processTx(tx) {
 
     tasks.push(limit(async function() {
       log.debug('txjson %s', tx.toJSON())
-      log.debug('backtrace.processTx: try remove utxo %s', input)
+      log.debug('oracle.processTx: try remove utxo %s', input)
       if (input.prevTxId !== undefined) {
         const res = await db.utxo.remove(input.prevTxId, input.outputIndex)
         return [res, input]
@@ -105,13 +105,13 @@ async function processTx(tx) {
     }
   }
 
-  log.debug('backtrace.processTx: validOutputs %s, validInputs %s', validOutputs, validInputs)
+  log.debug('oracle.processTx: validOutputs %s, validInputs %s', validOutputs, validInputs)
   if (validOutputs.length <= 0 && validInputs.length <= 0) {
     return false
   } 
   
   if (validInputs.length > 0) {
-    isBacktraceTx = true
+    isOracleTx = true
   }
 
   // handle all type tx
@@ -124,12 +124,12 @@ async function processTx(tx) {
       }
       const res = await supportTypes[type].processTx(tx, inputs, validOutputs[type])
       if (res === true) {
-        isBacktraceTx = true
+        isOracleTx = true
       }
     }
   }
 
-  return isBacktraceTx
+  return isOracleTx
 }
 
 

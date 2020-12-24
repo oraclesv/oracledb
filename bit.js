@@ -7,7 +7,7 @@ const retry = require('retry')
 const config = require('./config.js')
 const db = require('./db.js')
 const log = require('./logger').logger
-const backtrace = require('./backtrace')
+const oracle = require('./oracle')
 const cache = require('./cache')
 
 let Info
@@ -213,7 +213,7 @@ const processRawTx = async function(rawtx, confirmed=0) {
 }
 
 const processTx = async function(tx) {
-  let res = await backtrace.processTx(tx)
+  let res = await oracle.processTx(tx)
   unconfirmed[tx.id] = res
   if (res) {
     log.info('processTx: new tx: %s', tx.id)
@@ -233,9 +233,9 @@ const processConfirmedTx = async function(tx) {
     log.debug('processConfirmed delete unconfirmed tx %s, %s', tx.id, unconfirmed[tx.id])
     delete unconfirmed[tx.id]
   } else {
-    let res = await backtrace.processTx(tx)
+    let res = await oracle.processTx(tx)
     if (res) {
-      log.info('processConfirmedTx: new backtrace tx:', tx.id)
+      log.info('processConfirmedTx: new oracle tx:', tx.id)
       let jsontx = tx.toJSON()
       jsontx['_id'] = jsontx['hash']
       delete jsontx['hash']

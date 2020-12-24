@@ -2,12 +2,14 @@ const assert = require('assert');
 const config = require('../config.js')
 const bsv = require('bsv')
 const db = require('../db')
-const backtrace = require('../backtrace')
+const oracle = require('../oracle')
 const proto = require('../protoheader')
 const cache = require('../cache')
 
 // first case: genesis tx
 
+const contractCode = Buffer.from('contract code test')
+const contractHash = bsv.crypto.Hash.sha256ripemd160(contractCode)
 const tokenType = Buffer.allocUnsafe(4)
 tokenType.writeUInt32LE(1)
 const tokenName = Buffer.alloc(10, 0)
@@ -48,6 +50,8 @@ describe('token', function() {
     }))
 
     const script = Buffer.concat([
+      contractCode,
+      contractHash,
       tokenName,
       genesisFlag, 
       Buffer.alloc(20, 0), // address
@@ -61,7 +65,7 @@ describe('token', function() {
       satoshis: bsvBalance,
     }))
 
-    const pres = await backtrace.processTx(tx)
+    const pres = await oracle.processTx(tx)
     assert.strictEqual(pres, true)
     curTx = tx
 
@@ -100,6 +104,8 @@ describe('token', function() {
     const buffValue = Buffer.alloc(8, 0)
     buffValue.writeBigUInt64LE(tokenValue)
     const script = Buffer.concat([
+      contractCode,
+      contractHash,
       tokenName,
       nonGenesisFlag, // genesis flag
       address, // address
@@ -114,7 +120,7 @@ describe('token', function() {
       satoshis: bsvBalance,
     }))
 
-    const pres = await backtrace.processTx(tx)
+    const pres = await oracle.processTx(tx)
     assert.strictEqual(pres, true)
     assert.strictEqual(cache.hasUtxo(curTx.id, 0), false)
 
@@ -141,6 +147,8 @@ describe('token', function() {
     const buffValue2 = Buffer.alloc(8, 0)
     buffValue2.writeBigUInt64LE(tokenValue2)
     const script2 = Buffer.concat([
+      contractCode,
+      contractHash,
       tokenName,
       nonGenesisFlag, // genesis flag
       address, // address
@@ -159,6 +167,8 @@ describe('token', function() {
     const tokenValue3 = tokenValue - tokenValue2
     buffValue3.writeBigUInt64LE(tokenValue3)
     const script3 = Buffer.concat([
+      contractCode,
+      contractHash,
       tokenName,
       nonGenesisFlag, // genesis flag
       address, // address
@@ -172,7 +182,7 @@ describe('token', function() {
       satoshis: bsvBalance,
     }))
 
-    const pres2 = await backtrace.processTx(tx2)
+    const pres2 = await oracle.processTx(tx2)
     assert.strictEqual(pres2, true)
     assert.strictEqual(cache.hasUtxo(curTx.id, 0), false)
 
