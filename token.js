@@ -41,6 +41,7 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
       'isGenesis': isGenesis,
       'type': TokenProto.PROTO_TYPE,
       'tokenName': TokenProto.getTokenName(script),
+      'satoshis': BigInt(output.satoshis),
     }
     tasks.push(limit(async function() {
       const res = await db.utxo.insert(data)

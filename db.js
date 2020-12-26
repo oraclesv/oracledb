@@ -96,6 +96,7 @@ utxo = {
       data['tokenID'] = Binary(data['tokenID'])
       data['address'] = Binary(data['address'])
       data['script'] = Binary(data['script'])
+      data['satoshis'] = new Long(Number(data['satoshis'] & 0xFFFFFFFFn), Number((data['satoshis'] >> 32n) & 0xFFFFFFFFn))
       const res = await db.collection('utxo').insertOne(data)
       if (res.result['ok'] === 1) {
         log.info("utxo.insert txid %s, outputIndex %s, tokenID %s", data['txid'].toString('hex'), data['outputIndex'], data['tokenID'].toString('hex'))
@@ -120,6 +121,7 @@ utxo = {
       if (res.value !== null) {
         value = res.value
         value['tokenValue'] = BigInt(value['tokenValue'])
+        value['satoshis'] = BigInt(value['tokenValue'])
         value['txid'] = value['txid'].read(0, value['txid'].length())
         value['tokenID'] = value['tokenID'].read(0, value['tokenID'].length())
         value['address'] = value['address'].read(0, value['address'].length())

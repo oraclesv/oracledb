@@ -1,11 +1,9 @@
-
-
 const proto = require('./protoheader')
 
 const token = module.exports
 
 // token specific
-//<type specific data> = <token_name (10 bytes)> <is_genesis(1 byte)> <public key hash(20 bytes)> + <token value(8 bytes)> + <genesis script code hash as tokenid(20 bytes)> + <proto header>
+//<type specific data> = <contract hash(20 bytes)> + <token_name (10 bytes)> <is_genesis(1 byte)> <public key hash(20 bytes)> + <token value(8 bytes)> + <genesis script code hash as tokenid(20 bytes)> + <proto header>
 const TOKEN_ID_LEN = 20
 const TOKEN_VALUE_LEN = 8
 const TOKEN_ADDRESS_LEN = 20
@@ -58,4 +56,18 @@ token.getContractHash = function(script) {
 
 token.getContractCode = function(script) {
   return script.subarray(0, script.length - TOKEN_HEADER_LEN)
+}
+
+token.getNewTokenScript = function(script, address, tokenAmount) {
+  const scriptBuf = Buffer.from(script.toHex(), 'hex')
+  const amountBuf = Buffer.alloc(8, 0)
+  amountBuf.writeBigUInt64LE(BigInt(tokenAmount))
+  const firstBuf = scriptBuf.subarray(0, scriptBuf.length - TOKEN_ADDRESS_OFFSET)
+  const newScript = Buffer.concat([
+    firstBuf,
+    address.hashBuffer,
+    amountBuf,
+    scriptBuf.subarray(scriptBuf.length - TOKEN_ID_OFFSET, scriptBuf.length)
+  ])
+  return newScript
 }
