@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "description": "oracle database over bitcoin",
   "main": "index.js",
-  "author": "21 Century Motor Company and CC",
   "license": "MIT",
   "scripts": {
     "start": "node index",
