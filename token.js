@@ -31,11 +31,12 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
     log.debug('insertTokenIDOutput: outputIndex %s, output %s', outputIndex, output)
     const script = output.script.toBuffer()
     const isGenesis = TokenProto.getGenesisFlag(script)
+    const address = TokenProto.getTokenAddress(script)
     const data = {
       'txid': txid,
       'outputIndex': outputIndex,
       'script': script,
-      'address': TokenProto.getTokenAddress(script),
+      'address': address,
       'tokenID': tokenID,
       'tokenValue': TokenProto.getTokenValue(script),
       'isGenesis': isGenesis,
@@ -44,6 +45,11 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
       'satoshis': BigInt(output.satoshis),
     }
     tasks.push(limit(async function() {
+      // insert wallet id
+      const walletId = await db.wallet.getWalletId(address)
+      if (walletId !== null) {
+        data['walletId'] = walletId
+      }
       const res = await db.utxo.insert(data)
       return [res, txid, outputIndex]
     }))

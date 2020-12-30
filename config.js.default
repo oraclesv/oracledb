@@ -36,6 +36,10 @@ module.exports = {
     }
   },
   'logger': {
-    'level': 'info'
+    'level': 'debug'
+  },
+  'http': {
+    'ip': '0.0.0.0',
+    'port': 18080
   }
 }

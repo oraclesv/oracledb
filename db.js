@@ -169,11 +169,43 @@ let createIndex = async function() {
   log.info('finished indexing mongodb...')
 }
 
+let wallet = {
+  insertAddress: async function(address, walletId) {
+    try {
+      const data = {
+        '_id': Binary(address),
+        'walletId': walletId
+      }
+      const res = await db.collection('wallet').insertOne(data)
+      if (res.result['ok'] === 1) {
+        log.info("wallet.insert address %s, %s", address.toString('hex'), walletId)
+        return true
+      } else {
+        log.error("wallet.insert address %s, %s failed", address.toString('hex'), walletId)
+        return false
+      }
+    } catch(e) {
+      log.error('wallet.insert address failed: %s, %s, %s', e, address, walletId)
+      return false
+    }
+  },
+  getWalletId: async function(address) {
+    const res = await db.collection('wallet').findOne({'_id': Binary(address)})
+    if (res !== null) {
+      if (res.walletId) {
+        return res.walletId
+      }
+    }
+    return null
+  }
+}
+
 module.exports = {
   init: init, 
   exit: exit, 
   tx: tx,
   info: info,
   utxo: utxo,
+  wallet: wallet,
   createIndex: createIndex,
 }

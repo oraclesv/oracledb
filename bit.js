@@ -5,20 +5,20 @@ const bsv = require('bsv')
 const retry = require('retry')
 
 const config = require('./config.js')
-const db = require('./db.js')
 const log = require('./logger').logger
 const oracle = require('./oracle')
 const cache = require('./cache')
+const db = require('./db')
 
 let Info
 let rpc
 
 const unconfirmed = {}
 
-const init = function(db, info) {
+const init = function(info) {
   return new Promise(function(resolve) {
     Info = info
-
+    //db = db
     rpc = new RpcClient(config.rpc)
     resolve()
   })
