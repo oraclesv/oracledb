@@ -39,6 +39,7 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
       'address': address,
       'tokenID': tokenID,
       'tokenValue': TokenProto.getTokenValue(script),
+      'decimalNum': TokenProto.getDecimalNum(script),
       'isGenesis': isGenesis,
       'type': TokenProto.PROTO_TYPE,
       'tokenName': TokenProto.getTokenName(script),

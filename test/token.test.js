@@ -17,6 +17,7 @@ tokenName.write('tcc')
 const txid = "b145b31e2b1b24103b0fc8f4b9e54953f5b90f9059559dd7612c629897b95820"
 const bsvBalance = 100
 const address = Buffer.from('ce0b4a25ec9a7db3ad28cf824aa624125ea8143d', 'hex')
+const decimalNum = Buffer.from('08', 'hex')
 const genesisFlag = Buffer.from('01', 'hex')
 const nonGenesisFlag = Buffer.from('00', 'hex')
 
@@ -54,6 +55,7 @@ describe('token', function() {
       contractHash,
       tokenName,
       genesisFlag, 
+      decimalNum,
       Buffer.alloc(20, 0), // address
       Buffer.alloc(8, 0), // token value
       Buffer.alloc(20, 0), // script code hash
@@ -108,6 +110,7 @@ describe('token', function() {
       contractHash,
       tokenName,
       nonGenesisFlag, // genesis flag
+      decimalNum,
       address, // address
       buffValue, // token value
       scriptHash, // script code hash
@@ -151,6 +154,7 @@ describe('token', function() {
       contractHash,
       tokenName,
       nonGenesisFlag, // genesis flag
+      decimalNum,
       address, // address
       buffValue2, // token value
       scriptHash, // script code hash
@@ -171,6 +175,7 @@ describe('token', function() {
       contractHash,
       tokenName,
       nonGenesisFlag, // genesis flag
+      decimalNum,
       address, // address
       buffValue3, // token value
       scriptHash, // script code hash
