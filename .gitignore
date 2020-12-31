@@ -3,3 +3,5 @@ node_modules
 .env
 *.log
 config.js
+config_test.js
+*.gz

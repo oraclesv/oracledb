@@ -197,6 +197,9 @@ let wallet = {
       }
     }
     return null
+  },
+  clear: async function() {
+    await db.collection('wallet').deleteMany({})
   }
 }
 

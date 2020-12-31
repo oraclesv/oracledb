@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node index",
     "lint": "./node_modules/.bin/eslint .",
-    "test": "mocha"
+    "test": "mocha test/*.test.js --reporter spec --timeout 600000",
+    "single-test": "mocha --reporter spec --timeout 600000"
   },
   "dependencies": {
     "bitcoind-rpc": "^0.8.1",

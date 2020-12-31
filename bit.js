@@ -188,7 +188,7 @@ const listen = function() {
       log.debug("zmq new rawtx")
       await processRawTx(message, confirmed=0)
     } else if (topic.toString() === 'hashblock') {
-      log.info("zmq new hashblock %s", message)
+      log.info("zmq new hashblock %s", Buffer.from(message).toString('hex'))
       await syncBlock()
     }
   })

@@ -1,5 +1,5 @@
 const assert = require('assert');
-const config = require('../config.js')
+const config = require('../config_test.js')
 const bsv = require('bsv')
 const db = require('../db')
 const oracle = require('../oracle')
