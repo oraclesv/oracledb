@@ -12,6 +12,8 @@
   "dependencies": {
     "bitcoind-rpc": "^0.8.1",
     "bsv": "^1.5.4",
+    "express": "^4.17.1",
+    "express-ipfilter": "^1.1.2",
     "mongodb": "^3.6",
     "p-limit": "^3.1.0",
     "retry": "^0.12.0",

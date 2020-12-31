@@ -25,6 +25,12 @@ module.exports = {
           {'txid': 1},
           {'address': 1},
           {'address': 1, 'tokenID': 1},
+          {'walletId': 1},
+        ]
+      },
+      'wallet': {
+        'keys': [
+          {'walletId': 1}
         ]
       }
     }
@@ -40,6 +46,9 @@ module.exports = {
   },
   'http': {
     'ip': '0.0.0.0',
-    'port': 18080
+    'port': 18080,
+    'whitelist': [
+      '127.0.0.1',
+    ]
   }
 }

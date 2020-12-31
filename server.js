@@ -1,5 +1,6 @@
 const express = require('express')
 const log = require('./logger').logger
+const ipfilter = require('express-ipfilter').IpFilter
 
 const app = express()
 
@@ -10,6 +11,8 @@ const db = require('./db')
 server.start = function(config) {
   app.use(express.json()) // for parsing application/json
   app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
+
+  app.use(ipfilter(config.whitelist, { mode: 'allow' }))
 
   app.get('/', function(req, res) {
     res.end('oracledb api')
