@@ -1,4 +1,5 @@
 const express = require('express')
+const bsv = require('bsv')
 const log = require('./logger').logger
 const ipfilter = require('express-ipfilter').IpFilter
 
@@ -26,7 +27,7 @@ server.start = function(config) {
       log.info('server.res_address ip %s, body %s', ip, req.body)
       const address = req.body.address
       const walletId = req.body.walletId
-      addr = bsv.Address.fromPublicKeyHash(address)
+      addr = bsv.Address.fromString(address)
       let dbres = await db.wallet.insertAddress(addr.hashBuffer, walletId)
       if (dbres === true) {
         res.send('insert address success')
