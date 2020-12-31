@@ -176,7 +176,11 @@ let wallet = {
         '_id': Binary(address),
         'walletId': walletId
       }
-      const res = await db.collection('wallet').insertOne(data)
+      const res = await db.collection('wallet').updateOne(
+        filter = {'_id': Binary(address)},
+        update = {'$set': {'walletId': walletId}},
+        options = {'upsert': 1}
+      )
       if (res.result['ok'] === 1) {
         log.info("wallet.insert address %s, %s", address.toString('hex'), walletId)
         return true
