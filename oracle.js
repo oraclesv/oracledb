@@ -2,14 +2,17 @@ const log = require('./logger').logger
 const pLimit = require('p-limit')
 const config = require('./config.js')
 const token = require('./token')
+const unique = require('./unique')
 const proto = require('./protoheader')
 const db = require('./db')
 const cache = require('./cache')
 
 const TOKEN_TYPE = 1
+const UNIQUE_TYPE = 2
 
 const supportTypes = {}
 supportTypes[TOKEN_TYPE] = token
+supportTypes[UNIQUE_TYPE] = unique 
 
 // script: buffer type
 function isValidHeader(script) {
@@ -33,16 +36,13 @@ function isValidHeader(script) {
     return false
   }
 
-  if (len < supportTypes[type].getHeaderLen()) {
+  specTypeLen = supportTypes[type].getHeaderLen(script)
+  if (specTypeLen > 0 && len < specTypeLen) {
     log.debug('isValidHeader: failed data len %s, %s', len, supportTypes[type].getHeaderLen())
     return false
   }
 
   return true
-}
-
-function genUtxoID(txid, outputIndex) {
-  return txid + outputIndex
 }
 
 // if tx is oracle type, return true else false
@@ -67,7 +67,7 @@ async function processTx(tx) {
       log.debug('txjson %s', tx.toJSON())
       log.debug('oracle.processTx: try remove utxo %s', input)
       if (input.prevTxId !== undefined) {
-        const res = await db.utxo.remove(input.prevTxId, input.outputIndex)
+        const res = await db.oracleUtxo.remove(input.prevTxId, input.outputIndex)
         return [res, input]
       } else {
         return [null, null]

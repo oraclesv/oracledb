@@ -1,6 +1,8 @@
 const MongoClient = require('mongodb').MongoClient
 const log = require('./logger').logger
 const { Long, Binary } = require('mongodb')
+const token = require('./tokenProto')
+const unique = require('./uniqueProto')
 
 let db
 let mongo
@@ -79,27 +81,38 @@ let info = {
   }
 }
 
-let utxo
-utxo = {
+const OracleUtxo = 'utxo'
+let oracleUtxo
+oracleUtxo = {
   genid: function(txid, outputIndex) {
-    log.debug('utxo.genid: type txid %s', typeof txid)
+    log.debug('token_utxo.genid: type txid %s', typeof txid)
     const bvalue = Buffer.alloc(4)
     bvalue.writeUInt32LE(outputIndex)
     return Binary(Buffer.concat([Buffer.from(txid, 'hex'), bvalue]))
   },
   insert: async function(data) {
     try {
-      data['_id'] = utxo.genid(data['txid'], data['outputIndex'])
+      data['_id'] = oracleUtxo.genid(data['txid'], data['outputIndex'])
       data['txid'] = Binary(Buffer.from(data['txid'], 'hex'))
-      const value = data['tokenValue']
-      data['tokenValue'] = new Long(Number(value & 0xFFFFFFFFn), Number((value >> 32n) & 0xFFFFFFFFn))
-      data['tokenID'] = Binary(data['tokenID'])
-      data['address'] = Binary(data['address'])
       data['script'] = Binary(data['script'])
       data['satoshis'] = new Long(Number(data['satoshis'] & 0xFFFFFFFFn), Number((data['satoshis'] >> 32n) & 0xFFFFFFFFn))
-      const res = await db.collection('utxo').insertOne(data)
+      if (data['type'] === token.PROTO_TYPE) {
+        const value = data['tokenValue']
+        data['tokenValue'] = new Long(Number(value & 0xFFFFFFFFn), Number((value >> 32n) & 0xFFFFFFFFn))
+        data['tokenID'] = Binary(data['tokenID'])
+        data['address'] = Binary(data['address'])
+      } else if (data['proto_type'] === unique.PROTO_TYPE) {
+        data['uniqueID'] = Binary(data['uniqueID'])
+      }
+
+      const res = await db.collection(OracleUtxo).insertOne(data)
       if (res.result['ok'] === 1) {
-        log.info("utxo.insert txid %s, outputIndex %s, tokenID %s", data['txid'].toString('hex'), data['outputIndex'], data['tokenID'].toString('hex'))
+        if (data['type'] == token.PROTO_TYPE) {
+          log.info("utxo.insert token txid %s, outputIndex %s, tokenID %s", data['txid'].toString('hex'), data['outputIndex'], data['tokenID'].toString('hex'))
+        }
+        else if (data['type'] == unique.PROTO_TYPE) {
+          log.info("utxo.insert unique txid %s, outputIndex %s, uniqueID %s", data['txid'].toString('hex'), data['outputIndex'], data['uniqueID'].toString('hex'))
+        }
         return true
       } else {
         log.error("utxo.insert txid %s, %s failed", data['txid'].toString('hex'), data['outputIndex'])
@@ -111,36 +124,43 @@ utxo = {
     }
   },
   remove: async function(txid, outputIndex) {
-    const id = utxo.genid(txid, outputIndex)
-    const res = await db.collection('utxo').findOneAndDelete(
+    const id = oracleUtxo.genid(txid, outputIndex)
+    const res = await db.collection(OracleUtxo).findOneAndDelete(
       filter = {'_id': id},
       )
     if (res && res.ok === 1) {
-      log.debug('db.utxo remove res: %s', res)
+      log.debug('db.oracleUtxo remove res: %s', res)
       let value = null
       if (res.value !== null) {
         value = res.value
-        value['tokenValue'] = BigInt(value['tokenValue'])
         value['satoshis'] = BigInt(value['tokenValue'])
         value['txid'] = value['txid'].read(0, value['txid'].length())
-        value['tokenID'] = value['tokenID'].read(0, value['tokenID'].length())
-        value['address'] = value['address'].read(0, value['address'].length())
         value['script'] = value['script'].read(0, value['script'].length())
-        log.info('db.utxo remove utxo txid %s, outputIndex %s, address %s, tokenID %s, tokenValue %s, type %s, isGenesis %s', value.txid.toString('hex'), value.outputIndex, value.address.toString('hex'), value.tokenID.toString('hex'), value.tokenValue, value.type, value.isGenesis)
+
+        if (value['type'] == token.PROTO_TYPE) {
+          value['tokenValue'] = BigInt(value['tokenValue'])
+          value['tokenID'] = value['tokenID'].read(0, value['tokenID'].length())
+          value['address'] = value['address'].read(0, value['address'].length())
+          log.info('db.oracleUtxo token remove utxo txid %s, outputIndex %s, address %s, tokenID %s, tokenValue %s, type %s, isGenesis %s', value.txid.toString('hex'), value.outputIndex, value.address.toString('hex'), value.tokenID.toString('hex'), value.tokenValue, value.type, value.isGenesis)
+        }
+        else if (value['type'] == unique.PROTO_TYPE) {
+          value['uniqueID'] = value['uniqueID'].read(0, value['uniqueID'].length())
+          log.info('db.oracleUtxo unique remove utxo txid %s, outputIndex %s, uniqueID %s, type %s, isGenesis %s', value.txid.toString('hex'), value.outputIndex, value.uniqueID.toString('hex'), value.type, value.isGenesis)
+        }
       }
       return value
     } else {
-      log.error('db.utxo remove failed res %s', res)
+      log.error('db.oracleUtxo remove failed res %s', res)
       return null 
     }
   },
   forEach: async function(callback) {
-    await db.collection('utxo').find().forEach(function(myDoc) {
+    await db.collection(OracleUtxo).find().forEach(function(myDoc) {
       callback(myDoc)
     })
   },
   clear: async function() {
-    await db.collection('utxo').deleteMany({})
+    await db.collection(OracleUtxo).deleteMany({})
   }
 }
 
@@ -212,7 +232,7 @@ module.exports = {
   exit: exit, 
   tx: tx,
   info: info,
-  utxo: utxo,
+  oracleUtxo: oracleUtxo,
   wallet: wallet,
   createIndex: createIndex,
 }

@@ -9,7 +9,7 @@ const TokenProto = require('./tokenProto')
 
 const token = module.exports
 
-token.getHeaderLen = function() {
+token.getHeaderLen = function(script) {
   return TokenProto.getHeaderLen()
 }
 
@@ -51,7 +51,7 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
       if (walletId !== null) {
         data['walletId'] = walletId
       }
-      const res = await db.utxo.insert(data)
+      const res = await db.oracleUtxo.insert(data)
       return [res, txid, outputIndex]
     }))
   }
@@ -132,9 +132,9 @@ token.processTx = async function(tx, validInputs, validOutputs) {
         }
       }
     }
-    if (validFlag === false || outValue[tokenIDHex] !== inValue[tokenIDHex]) {
+    if (validFlag === false || outValue[tokenIDHex] > inValue[tokenIDHex]) {
       invalidTokenID.push(tokenIDHex)
-      log.warn("token.processTx invalidTokenID %s, txid %s, outvalue %s, invalue %s", tokenIDHex, tx.id, outValue[tokenIDHex], inValue[tokenIDHex])
+      log.info("token.processTx invalidTokenID %s, txid %s, outvalue %s, invalue %s", tokenIDHex, tx.id, outValue[tokenIDHex], inValue[tokenIDHex])
     } else {
       token.insertTokenIDOutput(tx.id, Buffer.from(tokenIDHex, 'hex'), tokenIDOutputs[tokenIDHex], tasks, limit)
     }

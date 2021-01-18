@@ -289,7 +289,7 @@ const syncBlock = async function() {
 }
 
 const syncUtxoCache = async function() {
-  await db.utxo.forEach(function(myDoc) {
+  await db.oracleUtxo.forEach(function(myDoc) {
     const txid = myDoc.txid.read(0, myDoc.txid.length()).toString('hex')
     const outputIndex = myDoc.outputIndex
     cache.addUtxo(txid, outputIndex)

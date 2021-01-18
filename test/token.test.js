@@ -36,7 +36,7 @@ describe('token', function() {
   });
 
   beforeEach(async function() {
-    await db.utxo.clear()
+    await db.oracleUtxo.clear()
     cache.clear()
     // runs before each test in this block
     const tx = new bsv.Transaction()
@@ -82,7 +82,7 @@ describe('token', function() {
   // test cases
   it('genesis should return success', async function() {
     // find it in the utxo
-    const res = await db.utxo.remove(curTx.id, 0)
+    const res = await db.oracleUtxo.remove(curTx.id, 0)
     console.log("remove res:", res)
     assert.notStrictEqual(res, null)
     assert.strictEqual(res.txid.toString('hex'), curTx.id)
@@ -129,7 +129,7 @@ describe('token', function() {
 
     curTx = tx
 
-    //const res = await db.utxo.remove(curTx.id, 0)
+    //const res = await db.oracleUtxo.remove(curTx.id, 0)
     //console.log("remove res:", res)
     //assert.notStrictEqual(res, null)
     //assert.strictEqual(res.txid.toString('hex'), curTx.id)
@@ -195,12 +195,12 @@ describe('token', function() {
     assert.strictEqual(cache.hasUtxo(curTx.id, 0), true)
     assert.strictEqual(cache.hasUtxo(curTx.id, 1), true)
 
-    const res2 = await db.utxo.remove(curTx.id, 0)
+    const res2 = await db.oracleUtxo.remove(curTx.id, 0)
     assert.notStrictEqual(res2, null)
     assert.strictEqual(res2.txid.toString('hex'), curTx.id)
     assert.strictEqual(res2.tokenValue, tokenValue2)
 
-    const res3 = await db.utxo.remove(curTx.id, 1)
+    const res3 = await db.oracleUtxo.remove(curTx.id, 1)
     assert.notStrictEqual(res3, null)
     assert.strictEqual(res3.txid.toString('hex'), curTx.id)
     assert.strictEqual(res3.tokenValue, tokenValue3)
