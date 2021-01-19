@@ -12,8 +12,10 @@ const contractCode = Buffer.from('contract code test')
 const contractHash = bsv.crypto.Hash.sha256ripemd160(contractCode)
 const tokenType = Buffer.allocUnsafe(4)
 tokenType.writeUInt32LE(1)
-const tokenName = Buffer.alloc(10, 0)
-tokenName.write('tcc')
+const tokenSymbol = Buffer.alloc(10, 0)
+tokenSymbol.write('ttn')
+const tokenName = Buffer.alloc(20, 0)
+tokenName.write('test token name')
 const txid = "b145b31e2b1b24103b0fc8f4b9e54953f5b90f9059559dd7612c629897b95820"
 const bsvBalance = 100
 const address = Buffer.from('ce0b4a25ec9a7db3ad28cf824aa624125ea8143d', 'hex')
@@ -54,6 +56,7 @@ describe('token', function() {
       contractCode,
       contractHash,
       tokenName,
+      tokenSymbol,
       genesisFlag, 
       decimalNum,
       Buffer.alloc(20, 0), // address
@@ -109,6 +112,7 @@ describe('token', function() {
       contractCode,
       contractHash,
       tokenName,
+      tokenSymbol,
       nonGenesisFlag, // genesis flag
       decimalNum,
       address, // address
@@ -153,6 +157,7 @@ describe('token', function() {
       contractCode,
       contractHash,
       tokenName,
+      tokenSymbol,
       nonGenesisFlag, // genesis flag
       decimalNum,
       address, // address
@@ -174,6 +179,7 @@ describe('token', function() {
       contractCode,
       contractHash,
       tokenName,
+      tokenSymbol,
       nonGenesisFlag, // genesis flag
       decimalNum,
       address, // address

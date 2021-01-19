@@ -43,6 +43,7 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
       'isGenesis': isGenesis,
       'type': TokenProto.PROTO_TYPE,
       'tokenName': TokenProto.getTokenName(script),
+      'tokenSymbol': TokenProto.getTokenSymbol(script),
       'satoshis': BigInt(output.satoshis),
     }
     tasks.push(limit(async function() {
