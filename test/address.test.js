@@ -1,6 +1,6 @@
 const assert = require('assert')
 const bsv = require('bsv')
-const db = require('../db')
+const db = require('../src/db')
 const config = require('../config_test.js')
 
 const address = '1HSUUe1jTgBYBdzL22jQLoqK1AeSU7LPSu'

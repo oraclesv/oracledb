@@ -1,5 +1,5 @@
 const logger = require('./logger')
-const UniqueProto = require('./uniqueProto')
+const UniqueProto = require('./proto/uniqueProto')
 
 const unique = module.exports
 

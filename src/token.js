@@ -2,10 +2,10 @@ const pLimit = require('p-limit')
 const bsv = require('bsv')
 
 const db = require('./db')
-const config = require('./config.js')
+const config = require('../config.js')
 const log = require('./logger').logger
 const cache = require('./cache')
-const TokenProto = require('./tokenProto')
+const TokenProto = require('./proto/tokenProto')
 
 const token = module.exports
 

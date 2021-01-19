@@ -1,8 +1,8 @@
 const MongoClient = require('mongodb').MongoClient
 const log = require('./logger').logger
 const { Long, Binary } = require('mongodb')
-const token = require('./tokenProto')
-const unique = require('./uniqueProto')
+const token = require('./proto/tokenProto')
+const unique = require('./proto/uniqueProto')
 
 let db
 let mongo

@@ -1,9 +1,9 @@
 const log = require('./logger').logger
 const pLimit = require('p-limit')
-const config = require('./config.js')
+const config = require('../config.js')
 const token = require('./token')
 const unique = require('./unique')
-const proto = require('./protoheader')
+const proto = require('./proto/protoheader')
 const db = require('./db')
 const cache = require('./cache')
 

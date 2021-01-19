@@ -1,5 +1,5 @@
 const winston = require('winston') 
-const config = require('./config')
+const config = require('../config')
 const { combine, timestamp, label, printf, splat} = winston.format;
 
 // TODO: locale time

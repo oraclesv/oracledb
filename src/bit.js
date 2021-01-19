@@ -4,7 +4,7 @@ const pLimit = require('p-limit')
 const bsv = require('bsv')
 const retry = require('retry')
 
-const config = require('./config.js')
+const config = require('../config.js')
 const log = require('./logger').logger
 const oracle = require('./oracle')
 const cache = require('./cache')

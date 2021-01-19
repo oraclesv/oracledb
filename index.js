@@ -1,9 +1,9 @@
 const config = require('./config.js')
-const Info = require('./info.js')
-const Bit = require('./bit.js')
-const db = require('./db')
-const log = require('./logger').logger
-const server = require('./server')
+const Info = require('./src/info.js')
+const Bit = require('./src/bit.js')
+const db = require('./src/db')
+const log = require('./src/logger').logger
+const server = require('./src/server')
 
 const daemon = {
   run: async function() {

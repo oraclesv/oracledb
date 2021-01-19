@@ -1,10 +1,10 @@
 const assert = require('assert');
 const config = require('../config_test.js')
 const bsv = require('bsv')
-const db = require('../db')
-const oracle = require('../oracle')
-const proto = require('../protoheader')
-const cache = require('../cache')
+const db = require('../src/db')
+const oracle = require('../src/oracle')
+const proto = require('../src/proto/protoheader')
+const cache = require('../src/cache')
 
 // first case: genesis tx
 
