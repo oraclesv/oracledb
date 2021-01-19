@@ -21,11 +21,14 @@ module.exports = {
       },
       'utxo': {
         'keys': [
-          {'tokenID': 1},
+          {'walletId': 1},
           {'txid': 1},
+          // type token
+          {'tokenID': 1},
           {'address': 1},
           {'address': 1, 'tokenID': 1},
-          {'walletId': 1},
+          // type unique
+          {'uniqueID': 1},
         ]
       },
       'wallet': {
