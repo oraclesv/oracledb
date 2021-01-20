@@ -48,8 +48,8 @@ function isValidHeader(script) {
 // if tx is oracle type, return true else false
 async function processTx(tx) {
   log.debug("oracle.processTx: %s", tx.id)
-  const validInputs = new Map()
-  const validOutputs = new Map()
+  const validInputs = {}
+  const validOutputs = {}
   let isOracleTx = false
 
   const tasks = []
@@ -105,12 +105,12 @@ async function processTx(tx) {
     }
   }
 
-  log.debug('oracle.processTx: validOutputs %s, validInputs %s', validOutputs, validInputs)
-  if (validOutputs.length <= 0 && validInputs.length <= 0) {
+  log.debug('oracle.processTx: validOutputs %s, %s, validInputs %s, %s', validOutputs,  validInputs)
+  if (Object.keys(validOutputs).length <= 0 && Object.keys(validInputs).length <= 0) {
     return false
   } 
   
-  if (validInputs.length > 0) {
+  if (Object.keys(validInputs).length > 0) {
     isOracleTx = true
   }
 

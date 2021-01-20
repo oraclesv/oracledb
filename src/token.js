@@ -13,14 +13,39 @@ token.getHeaderLen = function(script) {
   return TokenProto.getHeaderLen()
 }
 
-token.checkContract = function(script) {
+token.checkContract = function(script, inputOracleData) {
+  if (inputOracleData === undefined) {
+    log.debug('checkContract failed with null inputOracleData')
+    return false
+  }
   const contractCode = TokenProto.getContractCode(script)
   const contractHash = TokenProto.getContractHash(script)
   const hash = bsv.crypto.Hash.sha256ripemd160(contractCode)
-  if (contractHash.compare(hash) === 0) {
-    return true
+  if (contractHash.compare(hash) !== 0) {
+    log.debug('checkContract failed with illegal contractHash')
+    return false
   }
-  return false
+
+  // check input and output oracle data
+  const oracleData = TokenProto.getOracleData(script)
+  const address = TokenProto.getTokenAddress(script)
+  const amount = TokenProto.getTokenAmount(script)
+  const inputGenesisFlag = TokenProto.getGenesisFlag(inputOracleData)
+  let newOracleData
+  if (inputGenesisFlag === 1) {
+    const tokenID = TokenProto.getTokenID(script)
+    newOracleData = TokenProto.getNewTokenScriptFromGenesis(inputOracleData, address, amount, tokenID) 
+    log.debug("token.checkContract: tokenID %s, address %s, amount %s", tokenID.toString('hex'), address.toString('hex'), amount)
+  } else {
+    newOracleData = TokenProto.getNewTokenScript(inputOracleData, address, amount) 
+  }
+
+  if (newOracleData.compare(oracleData) !== 0) {
+    log.debug('checkContract failed with illegal oracleData %s, %s', newOracleData.toString('hex'), oracleData.toString('hex'))
+    return false
+  }
+
+  return true
 }
 
 token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
@@ -38,7 +63,7 @@ token.insertTokenIDOutput = function(txid, tokenID, outputs, tasks, limit) {
       'script': script,
       'address': address,
       'tokenID': tokenID,
-      'tokenValue': TokenProto.getTokenValue(script),
+      'tokenValue': TokenProto.getTokenAmount(script),
       'decimalNum': TokenProto.getDecimalNum(script),
       'isGenesis': isGenesis,
       'type': TokenProto.PROTO_TYPE,
@@ -66,11 +91,35 @@ token.processTx = async function(tx, validInputs, validOutputs) {
 
   const tasks = []
   const limit = pLimit(config.db.max_concurrency)
+
+  // count the input token value
+  const inValue = {}
+  const inputTokenOracleData = {}
+  for (const inputData of validInputs) {
+    //const input = inputData[0]
+    const script = inputData[1]
+    log.debug('input script: %s, %s', script.length, script.toString('hex'))
+    const value = TokenProto.getTokenAmount(script)
+    const tokenID = TokenProto.getTokenID(script)
+    let tokenIDHex = tokenID.toString('hex')
+    if (inValue[tokenIDHex] === undefined) {
+      inValue[tokenIDHex] = BigInt(0)
+    }
+    inValue[tokenIDHex] += value
+    const genesisFlag = TokenProto.getGenesisFlag(script)
+    if (genesisFlag === 1) {
+      tokenIDHex = Buffer.from(bsv.crypto.Hash.sha256ripemd160(script)).toString('hex')
+      log.debug('genesis calculate tokenID: %s', tokenIDHex)
+    }
+    inputTokenOracleData[tokenIDHex] = TokenProto.getOracleData(script)
+  }
+
+  log.debug('token.processTx: inputTokenOracleData %s', inputTokenOracleData)
   // count the output token value
   for (const outputData of validOutputs) {
     const output = outputData[1]
     const script = output.script.toBuffer()
-    const value = TokenProto.getTokenValue(script)
+    const value = TokenProto.getTokenAmount(script)
     const tokenID = TokenProto.getTokenID(script)
     const tokenIDHex = tokenID.toString('hex')
     const isGenesis = TokenProto.getGenesisFlag(script)
@@ -85,7 +134,7 @@ token.processTx = async function(tx, validInputs, validOutputs) {
       continue
     }
     // check the contract code consistency
-    if (token.checkContract(script) === false) {
+    if (token.checkContract(script, inputTokenOracleData[tokenIDHex]) === false) {
       continue
     }
     if (!outValue[tokenIDHex]) {
@@ -96,44 +145,12 @@ token.processTx = async function(tx, validInputs, validOutputs) {
     tokenIDOutputs[tokenIDHex].push(outputData)
   }
 
-  // count the input token value
-  const inValue = {}
-  const inContractHash = {}
-  for (const inputData of validInputs) {
-    //const input = inputData[0]
-    const script = inputData[1]
-    log.debug('input script: %s, %s', script.length, script.toString('hex'))
-    const value = TokenProto.getTokenValue(script)
-    const tokenID = TokenProto.getTokenID(script)
-    const tokenIDHex = tokenID.toString('hex')
-    if (inValue[tokenIDHex] === undefined) {
-      inValue[tokenIDHex] = BigInt(0)
-    }
-    inValue[tokenIDHex] += value
-    inContractHash[tokenIDHex] = TokenProto.getContractHash(script)
-  }
-
   // compare token input and output
   const invalidTokenID = []
   for (const tokenIDHex in outValue) {
     // check the contract code
-    let validFlag = false
     log.debug("token.processTx: validInputs %s, %s", tokenIDHex, validInputs[tokenIDHex])
-    if (inContractHash[tokenIDHex] !== undefined) {
-      validFlag = true
-      const contractHash = inContractHash[tokenIDHex]
-      for (const outputData of validOutputs) {
-        const output = outputData[1]
-        const script = output.script.toBuffer()
-        const outputContractHash = TokenProto.getContractHash(script)
-        if (contractHash.compare(outputContractHash) !== 0) {
-          flag = false
-          log.warn("token.processTx: input output contract code not match, input %s, output %s, %s", contractHash.toString('hex'), outputContractHash.toString('hex'), outputData[0])
-          break
-        }
-      }
-    }
-    if (validFlag === false || outValue[tokenIDHex] > inValue[tokenIDHex]) {
+    if (outValue[tokenIDHex] > inValue[tokenIDHex]) {
       invalidTokenID.push(tokenIDHex)
       log.info("token.processTx invalidTokenID %s, txid %s, outvalue %s, invalue %s", tokenIDHex, tx.id, outValue[tokenIDHex], inValue[tokenIDHex])
     } else {
