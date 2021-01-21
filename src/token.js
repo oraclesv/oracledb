@@ -130,6 +130,9 @@ token.processTx = async function(tx, validInputs, validOutputs) {
       log.debug('token.processTx: check genesis args: %s, %s', outputData[0], outputData[1])
       if (value === BigInt(0) && tokenID.compare(TokenProto.GENESIS_TOKEN_ID) === 0 && address.compare(TokenProto.EMPTY_ADDRESS) === 0) {
         token.insertTokenIDOutput(tx.id, tokenID, [outputData], tasks, limit)
+        const newTokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(script))
+        // try add new token ID
+        db.tokenID.insert(newTokenID, TokenProto.getTokenName(script), TokenProto.getTokenSymbol(script))
       }
       continue
     }

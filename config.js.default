@@ -12,31 +12,7 @@ module.exports = {
   'db': {
     'name': 'oracledb',
     'url': 'mongodb://localhost:27017',
-    'max_concurrency': 30,
-    'index': {
-      'tx': {
-        'keys': [
-          {'confirmed': 1}
-        ]
-      },
-      'utxo': {
-        'keys': [
-          {'walletId': 1},
-          {'txid': 1},
-          // type token
-          {'tokenID': 1},
-          {'address': 1},
-          {'address': 1, 'tokenID': 1},
-          // type unique
-          {'uniqueID': 1},
-        ]
-      },
-      'wallet': {
-        'keys': [
-          {'walletId': 1}
-        ]
-      }
-    }
+    'max_concurrency': 30
   },
   'zmq': {
     'incoming': {

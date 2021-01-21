@@ -1,8 +1,9 @@
 const MongoClient = require('mongodb').MongoClient
 const log = require('./logger').logger
-const { Long, Binary } = require('mongodb')
+const { Long, Binary, ReadPreference } = require('mongodb')
 const token = require('./proto/tokenProto')
 const unique = require('./proto/uniqueProto')
+const dbindex = require('./dbindex')
 
 let db
 let mongo
@@ -81,7 +82,7 @@ let info = {
   }
 }
 
-const OracleUtxo = 'utxo'
+const ORACLE_UTXO = 'utxo'
 let oracleUtxo
 oracleUtxo = {
   genid: function(txid, outputIndex) {
@@ -105,7 +106,7 @@ oracleUtxo = {
         data['uniqueID'] = Binary(data['uniqueID'])
       }
 
-      const res = await db.collection(OracleUtxo).insertOne(data)
+      const res = await db.collection(ORACLE_UTXO).insertOne(data)
       if (res.result['ok'] === 1) {
         if (data['type'] == token.PROTO_TYPE) {
           log.info("utxo.insert token txid %s, outputIndex %s, tokenID %s", data['txid'].toString('hex'), data['outputIndex'], data['tokenID'].toString('hex'))
@@ -125,15 +126,15 @@ oracleUtxo = {
   },
   remove: async function(txid, outputIndex) {
     const id = oracleUtxo.genid(txid, outputIndex)
-    const res = await db.collection(OracleUtxo).findOneAndDelete(
+    const res = await db.collection(ORACLE_UTXO).findOneAndDelete(
       filter = {'_id': id},
       )
     if (res && res.ok === 1) {
-      log.debug('db.oracleUtxo remove res: %s', res)
+      log.debug('db.oracleUtxo remove res: %s, %s', res, res.value)
       let value = null
       if (res.value !== null) {
         value = res.value
-        value['satoshis'] = BigInt(value['tokenValue'])
+        value['satoshis'] = BigInt(value['satoshis'])
         value['txid'] = value['txid'].read(0, value['txid'].length())
         value['script'] = value['script'].read(0, value['script'].length())
 
@@ -155,33 +156,46 @@ oracleUtxo = {
     }
   },
   forEach: async function(callback) {
-    await db.collection(OracleUtxo).find().forEach(function(myDoc) {
-      callback(myDoc)
+    await db.collection(ORACLE_UTXO).find().forEach(function(doc) {
+      callback(doc)
     })
   },
+  getAddressTokenUtxos: async function(address, tokenID) {
+    let data = []
+    await db.collection(ORACLE_UTXO).find(
+      {'address': Binary(address), 'tokenID': Binary(tokenID)},
+      {'projection': {'txid': 1, 'outputIndex': 1, 'satoshis': 1, 'script': 1}, 'readPreference': ReadPreference.PRIMARY_SECONDARY, 'hint': {'address': 1, 'tokenID': 1}}
+      ).forEach(function(doc) {
+      const utxo = {
+        txid: doc['txid'].read(0, doc['txid'].length()).toString('hex'),
+        outputIndex: doc['outputIndex'],
+        satoshis: BigInt(doc['satoshis']).toString(),
+        script: doc['script'].read(0, doc['script'].length()).toString('hex'),
+      }
+      log.debug('oracleUxto.getAddressTokenUtxos: find one %s', utxo)
+      data.push(utxo)
+    })
+    return data
+  },
   clear: async function() {
-    await db.collection(OracleUtxo).deleteMany({})
+    await db.collection(ORACLE_UTXO).deleteMany({})
   }
 }
 
 let createIndex = async function() {
   log.info('index mongodb')
 
-  if (config.index) {
-    const collectionNames = Object.keys(config.index)
-    for(let j=0; j<collectionNames.length; j++) {
-      const collectionName = collectionNames[j]
-      const keys = config.index[collectionName].keys
-      if (keys) {
-        for(let i=0; i<keys.length; i++) {
-          try {
-            const res = await db.collection(collectionName).createIndex(keys[i])
-            log.info('create index %s, res %s', keys[i], res)
-          } catch (e) {
-            log.error('create index failed %s', e)
-            process.exit()
-          }
-        }
+  const collectionNames = Object.keys(dbindex)
+  for(let j=0; j<collectionNames.length; j++) {
+    const collectionName = collectionNames[j]
+    const keys = dbindex[collectionName]
+    for(let i=0; i<keys.length; i++) {
+      try {
+        const res = await db.collection(collectionName).createIndex(keys[i])
+        log.info('create index %s, res %s', keys[i], res)
+      } catch (e) {
+        log.error('create index failed %s', e)
+        process.exit()
       }
     }
   }
@@ -227,6 +241,60 @@ let wallet = {
   }
 }
 
+const TOKEN_ID = 'tokenid'
+let tokenID = {
+  insert: async function(tokenID, name, symbol) {
+    try {
+      const res = await db.collection(TOKEN_ID).updateOne(
+        filter = {'_id': Binary(tokenID)},
+        update = {'$set': {'name': name, 'symbol': symbol}},
+        options = {'upsert': 1}
+      )
+      if (res.result['ok'] === 1) {
+        log.info("tokenID.insert tokenID %s, name %s, symbol %s", tokenID.toString('hex'), name, symbol)
+        return true
+      } else {
+        log.error("tokenID.insert failed tokenID %s, name %s, symbol %s", tokenID.toString('hex'), name, symbol)
+        return false
+      }
+    } catch(e) {
+      log.error("tokenID.insert exception tokenID %s, name %s, symbol %s, e %s", tokenID.toString('hex'), name, symbol, e)
+      return false
+    }
+  },
+
+  getAllTokenIDs: async function() {
+    let tokenIDs = []
+    await db.collection(TOKEN_ID).find().forEach(function(doc) {
+      const data = {
+        tokenID: doc['_id'].read(0, doc['_id'].length()).toString('hex'),
+        name: doc['name'],
+        symbol: doc['symbol']
+      }
+      tokenIDs.push(data)
+    })
+    return tokenIDs
+  },
+
+  findOne: async function(tokenID) {
+    const res = await db.collection(TOKEN_ID).findOne({'_id': Binary(tokenID)})
+    log.info('tokenID.findOne: tokenID %s, res %s', tokenID.toString('hex'), res)
+    if (res !== null) {
+      const data = {
+        tokenID: res['_id'].read(0, res['_id'].length()),
+        name: res['name'],
+        symbol: res['symbol']
+      }
+      return data
+    }
+    return null
+  },
+
+  clear: async function() {
+    await db.collection(TOKEN_ID).deleteMany({})
+  }
+}
+
 module.exports = {
   init: init, 
   exit: exit, 
@@ -234,5 +302,6 @@ module.exports = {
   info: info,
   oracleUtxo: oracleUtxo,
   wallet: wallet,
+  tokenID: tokenID,
   createIndex: createIndex,
 }

@@ -177,6 +177,7 @@ describe('token', function() {
   before(async function() {
     // runs once before the first test in this block
     await db.init(config.db)
+    await db.createIndex()
   });
 
   after(async function() {
@@ -187,6 +188,7 @@ describe('token', function() {
   beforeEach(async function() {
     log.debug("---------------------start test---------------")
     await db.oracleUtxo.clear()
+    await db.tokenID.clear()
     cache.clear()
   });
 
@@ -199,12 +201,14 @@ describe('token', function() {
   it('should success with genesis tx', async function() {
     const genesisTx = await genGenesis()
     const pres = await oracle.processTx(genesisTx)
-
     assert.strictEqual(pres, true)
-
     assert.strictEqual(cache.hasUtxo(genesisTx.id, 0), true)
-    // find it in the utxo
-    //console.log("genesisTx:", genesisTx.id, genesisTx)
+
+    // check tokenID collection
+    tokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(genesisTx.outputs[0].script.toBuffer()))
+    const tokenIDRes = await db.tokenID.findOne(tokenID)
+    assert.strictEqual(tokenIDRes.tokenID.compare(tokenID), 0)
+
     const res = await db.oracleUtxo.remove(genesisTx.id, 0)
     //console.log("remove res:", res)
     assert.notStrictEqual(res, null)
@@ -254,14 +258,20 @@ describe('token', function() {
     await oracle.processTx(genesisTx)
     const tokenTx = await genToken(genesisTx)
 
+    //TODO: verify the res data
+
     const transferTx = await genTokenTransfer(tokenTx)
 
-    const res = await oracle.processTx(transferTx)
+    let res = await oracle.processTx(transferTx)
     assert.strictEqual(res, true)
     assert.strictEqual(cache.hasUtxo(tokenTx.id, 0), false)
 
     assert.strictEqual(cache.hasUtxo(transferTx.id, 0), true)
     assert.strictEqual(cache.hasUtxo(transferTx.id, 1), true)
+
+    res = await db.oracleUtxo.getAddressTokenUtxos(address, tokenID)
+    log.debug('getAddressTokenUtxos: res %s', res)
+    assert.strictEqual(res.length, 2)
 
     const res2 = await db.oracleUtxo.remove(transferTx.id, 0)
     assert.notStrictEqual(res2, null)

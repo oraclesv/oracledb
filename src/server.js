@@ -7,6 +7,10 @@ const app = express()
 
 const server = module.exports
 
+server.app = app
+
+let httpserver
+
 const db = require('./db')
 
 server.start = function(config) {
@@ -14,10 +18,41 @@ server.start = function(config) {
   app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
 
   // ip whitelist
-  app.use(ipfilter(config.whitelist, { mode: 'allow' }))
+  if (config.whitelist !== undefined) {
+    app.use(ipfilter(config.whitelist, { mode: 'allow' }))
+  }
 
   app.get('/', function(req, res) {
-    res.send('oracledb api')
+    res.json({'ok': 1, 'res': 'oracledb api'})
+  })
+
+  app.get('/get_tokenid_list', async function(req, res) {
+    const dbres = await db.tokenID.getAllTokenIDs()
+
+    if (dbres !== null) {
+      res.json({'ok': 1, 'res': dbres})
+    } else {
+      res.json({'ok': 0, 'error': 'canot get tokenid list from mongodb'})
+    }
+  })
+
+  app.get('/get_token_utxos', async function(req, res) {
+    const params = req.query
+    log.debug("get_token_utxos params %s", params)
+    let address, tokenID
+    try {
+      address = bsv.Address.fromString(params.address)
+      tokenID = Buffer.from(params.tokenid, 'hex')
+    } catch (e) {
+      log.error('get_token_utxos: %s', e)
+    }
+
+    if (address === null || tokenID === null) {
+      res.json({'ok': 0, 'error': 'address or tokenID is not illegal'})
+      return
+    }
+    const dbres = await db.oracleUtxo.getAddressTokenUtxos(address.hashBuffer, tokenID)
+    res.json({'ok': 1, 'res': dbres})
   })
 
   app.post('/reg_address', async function(req, res) {
@@ -30,17 +65,21 @@ server.start = function(config) {
       addr = bsv.Address.fromString(address)
       let dbres = await db.wallet.insertAddress(addr.hashBuffer, walletId)
       if (dbres === true) {
-        res.send('insert address success')
+        res.json({'ok': 1})
       } else {
-        res.send('insert address failed')
+        res.json({'ok': 0, 'error': 'insert failed'})
       }
     } catch(e) {
       log.error('server.reg_address error %s, stack %s', e, e.stack)
-      res.send('insert address failed ' + e)
+      res.json({'ok': 0, 'error': e})
     }
   })
 
-  app.listen(config.port, config.ip, function() {
+  httpserver = app.listen(config.port, config.ip, function() {
     log.info("start at listen %s:%s", config.ip, config.port)
   })
+}
+
+server.close = async function() {
+  await httpserver.close()
 }
