@@ -213,6 +213,10 @@ const processRawTx = async function(rawtx, confirmed=0) {
 }
 
 const processTx = async function(tx) {
+  if (unconfirmed[tx.id] !== undefined) {
+    log.info("processTx: repeat txid %s", tx.id)
+    return
+  }
   let res = await oracle.processTx(tx)
   unconfirmed[tx.id] = res
   if (res) {
@@ -244,21 +248,6 @@ const processConfirmedTx = async function(tx) {
     }
   }
 }
-
-/*const processRawBlock = async function(rawblock) {
-  // TODO: big block performance
-  let block = bsv.Block.fromRawBlock(rawblock)
-  log.info("processRawBlock: transaction length %s, %s", block.transactions.length, block)
-  let tasks = []
-  // use concurrency
-  let limit = pLimit(config.tx_max_concurrency)
-  for (let i = 0; i < block.transactions.length; i++) {
-    task.push(limit(async function() {
-      await processConfirmedTx(block.transactions[i])
-    }))
-  }
-  await Promise.all(tasks)
-}*/
 
 const syncBlock = async function() {
   try {
@@ -297,9 +286,17 @@ const syncUtxoCache = async function() {
   })
 }
 
+const syncTokenIDCache = async function() {
+  const tokenIDList = await db.tokenID.getAllTokenIDs()
+  for (const data of tokenIDList) {
+    cache.addTokenIDInfo(data.tokenID, data.name, token.symbol)
+  }
+}
+
 const run = async function() {
 
   await syncUtxoCache()
+  await syncTokenIDCache()
 
   // clear all unconfirmed tx
   await db.tx.removeAllUnconfirmed()

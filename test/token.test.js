@@ -258,8 +258,6 @@ describe('token', function() {
     await oracle.processTx(genesisTx)
     const tokenTx = await genToken(genesisTx)
 
-    //TODO: verify the res data
-
     const transferTx = await genTokenTransfer(tokenTx)
 
     let res = await oracle.processTx(transferTx)
@@ -272,11 +270,22 @@ describe('token', function() {
     res = await db.oracleUtxo.getAddressTokenUtxos(address, tokenID)
     log.debug('getAddressTokenUtxos: res %s', res)
     assert.strictEqual(res.length, 2)
+    const tokenIDInfos = cache.getAllTokenIDInfo()
+    //assert.strictEqual(Object.keys(tokenIDInfos).length, 1)
+    assert.strictEqual(tokenIDInfos[tokenID.toString('hex')].name, tokenName.toString('hex'))
+    assert.strictEqual(tokenIDInfos[tokenID.toString('hex')].symbol, tokenSymbol.toString('hex'))
 
     const res2 = await db.oracleUtxo.remove(transferTx.id, 0)
     assert.notStrictEqual(res2, null)
     assert.strictEqual(res2.txid.toString('hex'), transferTx.id)
     assert.strictEqual(res2.tokenValue, tokenValue2)
+    // verify the res data
+    assert.strictEqual(res2.satoshis, BigInt(bsvBalance))
+    assert.strictEqual(res2.tokenID.compare(tokenID), 0)
+    assert.strictEqual(res2.tokenName.compare(tokenName), 0)
+    assert.strictEqual(res2.tokenSymbol.compare(tokenSymbol),0)
+    assert.strictEqual(res2.address.compare(address), 0)
+    assert.strictEqual(res2.type, 1)
 
     const res3 = await db.oracleUtxo.remove(transferTx.id, 1)
     assert.notStrictEqual(res3, null)

@@ -132,7 +132,10 @@ token.processTx = async function(tx, validInputs, validOutputs) {
         token.insertTokenIDOutput(tx.id, tokenID, [outputData], tasks, limit)
         const newTokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(script))
         // try add new token ID
-        db.tokenID.insert(newTokenID, TokenProto.getTokenName(script), TokenProto.getTokenSymbol(script))
+        const name = TokenProto.getTokenName(script)
+        const symbol = TokenProto.getTokenSymbol(script)
+        db.tokenID.insert(newTokenID, name, symbol)
+        cache.addTokenIDInfo(newTokenID.toString('hex'), name.toString('hex'), symbol.toString('hex'))
       }
       continue
     }

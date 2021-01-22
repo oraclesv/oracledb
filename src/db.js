@@ -101,6 +101,8 @@ oracleUtxo = {
         const value = data['tokenValue']
         data['tokenValue'] = new Long(Number(value & 0xFFFFFFFFn), Number((value >> 32n) & 0xFFFFFFFFn))
         data['tokenID'] = Binary(data['tokenID'])
+        data['tokenName'] = Binary(data['tokenName'])
+        data['tokenSymbol'] = Binary(data['tokenSymbol'])
         data['address'] = Binary(data['address'])
       } else if (data['proto_type'] === unique.PROTO_TYPE) {
         data['uniqueID'] = Binary(data['uniqueID'])
@@ -141,6 +143,8 @@ oracleUtxo = {
         if (value['type'] == token.PROTO_TYPE) {
           value['tokenValue'] = BigInt(value['tokenValue'])
           value['tokenID'] = value['tokenID'].read(0, value['tokenID'].length())
+          value['tokenName'] = value['tokenName'].read(0, value['tokenName'].length())
+          value['tokenSymbol'] = value['tokenSymbol'].read(0, value['tokenSymbol'].length())
           value['address'] = value['address'].read(0, value['address'].length())
           log.info('db.oracleUtxo token remove utxo txid %s, outputIndex %s, address %s, tokenID %s, tokenValue %s, type %s, isGenesis %s', value.txid.toString('hex'), value.outputIndex, value.address.toString('hex'), value.tokenID.toString('hex'), value.tokenValue, value.type, value.isGenesis)
         }
@@ -247,11 +251,11 @@ let tokenID = {
     try {
       const res = await db.collection(TOKEN_ID).updateOne(
         filter = {'_id': Binary(tokenID)},
-        update = {'$set': {'name': name, 'symbol': symbol}},
+        update = {'$set': {'name': Binary(name), 'symbol': Binary(symbol)}},
         options = {'upsert': 1}
       )
       if (res.result['ok'] === 1) {
-        log.info("tokenID.insert tokenID %s, name %s, symbol %s", tokenID.toString('hex'), name, symbol)
+        log.info("tokenID.insert tokenID %s, name %s, symbol %s", tokenID.toString('hex'), name.toString('hex'), symbol.toString('hex'))
         return true
       } else {
         log.error("tokenID.insert failed tokenID %s, name %s, symbol %s", tokenID.toString('hex'), name, symbol)
@@ -268,8 +272,8 @@ let tokenID = {
     await db.collection(TOKEN_ID).find().forEach(function(doc) {
       const data = {
         tokenID: doc['_id'].read(0, doc['_id'].length()).toString('hex'),
-        name: doc['name'],
-        symbol: doc['symbol']
+        name: doc.name.read(0, doc.name.length()).toString('hex'),
+        symbol: doc.symbol.read(0, doc.symbol.length()).toString('hex')
       }
       tokenIDs.push(data)
     })
@@ -282,8 +286,8 @@ let tokenID = {
     if (res !== null) {
       const data = {
         tokenID: res['_id'].read(0, res['_id'].length()),
-        name: res['name'],
-        symbol: res['symbol']
+        name: res.name.read(0, res.name.length()).toString('hex'),
+        symbol: res.symbol.read(0, res.symbol.length()).toString('hex')
       }
       return data
     }

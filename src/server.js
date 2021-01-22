@@ -2,6 +2,7 @@ const express = require('express')
 const bsv = require('bsv')
 const log = require('./logger').logger
 const ipfilter = require('express-ipfilter').IpFilter
+const cache = require('./cache')
 
 const app = express()
 
@@ -26,14 +27,9 @@ server.start = function(config) {
     res.json({'ok': 1, 'res': 'oracledb api'})
   })
 
-  app.get('/get_tokenid_list', async function(req, res) {
-    const dbres = await db.tokenID.getAllTokenIDs()
-
-    if (dbres !== null) {
-      res.json({'ok': 1, 'res': dbres})
-    } else {
-      res.json({'ok': 0, 'error': 'canot get tokenid list from mongodb'})
-    }
+  app.get('/get_tokenid_list', function(req, res) {
+    const tokenIDs = cache.getAllTokenIDInfo()
+    res.json({'ok': 1, 'res': tokenIDs})
   })
 
   app.get('/get_token_utxos', async function(req, res) {

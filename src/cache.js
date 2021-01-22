@@ -53,3 +53,13 @@ Cache.hasUtxo = function(txid, index) {
     const key = Cache.getUtxoKey(txid, index)
     return Cache.has(key)
 }
+
+
+const tokenIDData = {}
+Cache.addTokenIDInfo = function(tokenID, name, symbol) {
+  tokenIDData[tokenID] = {'name': name, 'symbol': symbol}
+}
+
+Cache.getAllTokenIDInfo = function() {
+  return tokenIDData
+}
