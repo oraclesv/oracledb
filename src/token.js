@@ -124,7 +124,7 @@ token.processTx = async function(tx, validInputs, validOutputs) {
     const tokenIDHex = tokenID.toString('hex')
     const isGenesis = TokenProto.getGenesisFlag(script)
     const address = TokenProto.getTokenAddress(script)
-    log.debug('token.processTx: output value %s, tokenID %s, isGenesis %s', value, tokenIDHex, isGenesis)
+    log.debug('token.processTx: output value %s, tokenID %s, isGenesis %s, address %s', value, tokenIDHex, isGenesis, address.toString('hex'))
     if (isGenesis === 1) {
       // genesis tx data limit
       log.debug('token.processTx: check genesis args: %s, %s', outputData[0], outputData[1])

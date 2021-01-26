@@ -1,4 +1,6 @@
 const assert = require('assert');
+const chai = require('chai')
+const should = chai.should()
 const config = require('../config_test.js')
 const bsv = require('bsv')
 const db = require('../src/db')
@@ -6,6 +8,7 @@ const oracle = require('../src/oracle')
 const proto = require('../src/proto/protoheader')
 const cache = require('../src/cache')
 const log = require('../src/logger').logger
+const TokenProto = require('../src/proto/tokenProto')
 
 // first case: genesis tx
 
@@ -17,6 +20,10 @@ const tokenSymbol = Buffer.alloc(10, 0)
 tokenSymbol.write('ttn')
 const tokenName = Buffer.alloc(20, 0)
 tokenName.write('test token name')
+const tokenSymbol2 = Buffer.alloc(10, 0)
+tokenSymbol2.write('ttn2')
+const tokenName2 = Buffer.alloc(20, 0)
+tokenName2.write('the second token name')
 const txid = "b145b31e2b1b24103b0fc8f4b9e54953f5b90f9059559dd7612c629897b95820"
 const bsvBalance = 100
 const address = Buffer.from('ce0b4a25ec9a7db3ad28cf824aa624125ea8143d', 'hex')
@@ -28,7 +35,7 @@ const tokenValue = BigInt(1000000000000)
 let tokenID
 let tokenValue2, tokenValue3
 
-async function genGenesis(tokenAddress=null, tokenAmount=null, tokenID=null) {
+async function genGenesis(tokenAddress=null, tokenAmount=null, tokenID=null, tname=null) {
   // runs before each test in this block
   const tx = new bsv.Transaction()
   tx.addInput(new bsv.Transaction.Input({
@@ -47,14 +54,20 @@ async function genGenesis(tokenAddress=null, tokenAmount=null, tokenID=null) {
   if (tokenAmount === null) {
     tokenAmount = Buffer.alloc(8, 0)
   }
-  if (tokenID == null) {
+  if (tokenID === null) {
     tokenID = Buffer.alloc(20, 0)
   }
+
+  if (tname === null) {
+    tname = tokenName
+  }
+
+  log.debug('genGenesis: tokenAddress %s, tokenName %s, tokenID %s', tokenAddress.toString('hex'), tname.toString('hex'), tokenID.toString('hex'))
 
   const script = Buffer.concat([
     contractCode,
     contractHash,
-    tokenName,
+    tname,
     tokenSymbol,
     genesisFlag, 
     decimalNum,
@@ -85,23 +98,10 @@ async function genToken(genesisTx) {
     script: bsv.Script.empty(), // placeholder
   }))
 
-  tokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(genesisTx.outputs[0].script.toBuffer()))
+  const genesisScriptBuf = genesisTx.outputs[0].script.toBuffer()
+  tokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(genesisScriptBuf))
 
-  const buffValue = Buffer.alloc(8, 0)
-  buffValue.writeBigUInt64LE(tokenValue)
-  const script = Buffer.concat([
-    contractCode,
-    contractHash,
-    tokenName,
-    tokenSymbol,
-    nonGenesisFlag, // genesis flag
-    decimalNum,
-    address, // address
-    buffValue, // token value
-    tokenID, // tokenID
-    tokenType, // type
-    proto.PROTO_FLAG
-  ])
+  const script = TokenProto.getNewTokenScriptFromGenesis(genesisScriptBuf, address, tokenValue, tokenID)
 
   tx.addOutput(new bsv.Transaction.Output({
     script: bsv.Script.fromBuffer(script),
@@ -116,11 +116,13 @@ async function genToken(genesisTx) {
 }
 
 async function genTokenTransfer(tokenTx, add=0) {
+  const lockingScript = tokenTx.outputs[0].script
+  const scriptBuf = lockingScript.toBuffer()
   // token transfer
   const tx = new bsv.Transaction()
   tx.addInput(new bsv.Transaction.Input({
     output: new bsv.Transaction.Output({
-      script: tokenTx.outputs[0].script,
+      script: lockingScript,
       satoshis: bsvBalance
     }),
     prevTxId: tokenTx.id,
@@ -128,44 +130,16 @@ async function genTokenTransfer(tokenTx, add=0) {
     script: bsv.Script.empty(), // placeholder
   }))
 
-  tokenValue2 = BigInt(100)
-  const buffValue2 = Buffer.alloc(8, 0)
-  buffValue2.writeBigUInt64LE(tokenValue2)
-  const script2 = Buffer.concat([
-    contractCode,
-    contractHash,
-    tokenName,
-    tokenSymbol,
-    nonGenesisFlag, // genesis flag
-    decimalNum,
-    address, // address
-    buffValue2, // token value
-    tokenID, 
-    tokenType, // type
-    proto.PROTO_FLAG
-  ])
 
+  tokenValue2 = BigInt(100)
+  const script2 = TokenProto.getNewTokenScript(scriptBuf, address, tokenValue2)
   tx.addOutput(new bsv.Transaction.Output({
     script: bsv.Script.fromBuffer(script2),
     satoshis: bsvBalance,
   }))
 
-  const buffValue3 = Buffer.alloc(8, 0)
   tokenValue3 = tokenValue - tokenValue2 + BigInt(add)
-  buffValue3.writeBigUInt64LE(tokenValue3)
-  const script3 = Buffer.concat([
-    contractCode,
-    contractHash,
-    tokenName,
-    tokenSymbol,
-    nonGenesisFlag, // genesis flag
-    decimalNum,
-    address, // address
-    buffValue3, // token value
-    tokenID,
-    tokenType, // type
-    proto.PROTO_FLAG
-  ])
+  const script3 = TokenProto.getNewTokenScript(scriptBuf, address, tokenValue3)
   tx.addOutput(new bsv.Transaction.Output({
     script: bsv.Script.fromBuffer(script3),
     satoshis: bsvBalance,
@@ -205,7 +179,7 @@ describe('token', function() {
     assert.strictEqual(cache.hasUtxo(genesisTx.id, 0), true)
 
     // check tokenID collection
-    tokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(genesisTx.outputs[0].script.toBuffer()))
+    const tokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(genesisTx.outputs[0].script.toBuffer()))
     const tokenIDRes = await db.tokenID.findOne(tokenID)
     assert.strictEqual(tokenIDRes.tokenID.compare(tokenID), 0)
 
@@ -229,7 +203,7 @@ describe('token', function() {
   it('should failed with wrong genesis token amount', async function() {
     const amountBuf = Buffer.alloc(8, 0)
     amountBuf.writeBigUInt64LE(BigInt(1))
-    const genesisTx = await genGenesis(tokenAmount=amountBuf)
+    const genesisTx = await genGenesis(null, tokenAmount=amountBuf)
     const pres = await oracle.processTx(genesisTx)
 
     assert.strictEqual(pres, false)
@@ -242,7 +216,7 @@ describe('token', function() {
   it('should failed with wrong genesis token id', async function() {
     const testID = Buffer.alloc(20, 0)
     testID.write('test id')
-    const genesisTx = await genGenesis(tokenID=testID)
+    const genesisTx = await genGenesis(null, null, tokenID=testID)
     const pres = await oracle.processTx(genesisTx)
 
     assert.strictEqual(pres, false)
@@ -271,7 +245,6 @@ describe('token', function() {
     log.debug('getAddressTokenUtxos: res %s', res)
     assert.strictEqual(res.length, 2)
     const tokenIDInfos = cache.getAllTokenIDInfo()
-    //assert.strictEqual(Object.keys(tokenIDInfos).length, 1)
     assert.strictEqual(tokenIDInfos[tokenID.toString('hex')].name, tokenName.toString('hex'))
     assert.strictEqual(tokenIDInfos[tokenID.toString('hex')].symbol, tokenSymbol.toString('hex'))
 
@@ -427,4 +400,69 @@ describe('token', function() {
   })
 
   // TODO: multi tokenID inputs 
+  it('should success with two type tokens input', async function() {
+    const genesisTx = await genGenesis()
+    let res = await oracle.processTx(genesisTx)
+    res.should.equal(true)
+    const tokenTx = await genToken(genesisTx)
+    
+    const genesisTx2 = await genGenesis(null, null, null, tname=tokenName2)
+    res = await oracle.processTx(genesisTx2)
+    res.should.equal(true)
+    const tokenTx2 = await genToken(genesisTx2)
+
+    const tokenScript = tokenTx.outputs[0].script
+    const tokenScript2 = tokenTx2.outputs[0].script
+
+    const tx = new bsv.Transaction()
+    tx.addInput(new bsv.Transaction.Input({
+      output: new bsv.Transaction.Output({
+        script: tokenScript,
+        satoshis: bsvBalance
+      }),
+      prevTxId: tokenTx.id,
+      outputIndex: 0,
+      script: bsv.Script.empty(), // placeholder
+    }))
+
+    tx.addInput(new bsv.Transaction.Input({
+      output: new bsv.Transaction.Output({
+        script: tokenScript2,
+        satoshis: bsvBalance
+      }),
+      prevTxId: tokenTx2.id,
+      outputIndex: 0,
+      script: bsv.Script.empty(), // placeholder
+    }))
+
+    tokenValue2 = BigInt(100)
+    tokenValue3 = tokenValue - tokenValue2 + BigInt(add)
+
+    let outputScript = TokenProto.getNewTokenScript(tokenScript.toBuffer(), address, tokenValue2)
+    tx.addOutput(new bsv.Transaction.Output({
+      script: bsv.Script.fromBuffer(outputScript),
+      satoshis: bsvBalance,
+    }))
+
+    outputScript = TokenProto.getNewTokenScript(tokenScript.toBuffer(), address, tokenValue3)
+    tx.addOutput(new bsv.Transaction.Output({
+      script: bsv.Script.fromBuffer(outputScript),
+      satoshis: bsvBalance,
+    }))
+
+    outputScript = TokenProto.getNewTokenScript(tokenScript2.toBuffer(), address, tokenValue2)
+    tx.addOutput(new bsv.Transaction.Output({
+      script: bsv.Script.fromBuffer(outputScript),
+      satoshis: bsvBalance,
+    }))
+
+    outputScript = TokenProto.getNewTokenScript(tokenScript2.toBuffer(), address, tokenValue3)
+    tx.addOutput(new bsv.Transaction.Output({
+      script: bsv.Script.fromBuffer(outputScript),
+      satoshis: bsvBalance,
+    }))
+
+    res = await oracle.processTx(tx)
+    res.should.equal(true)
+  })
 })

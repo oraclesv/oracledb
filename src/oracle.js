@@ -64,7 +64,6 @@ async function processTx(tx) {
     }
 
     tasks.push(limit(async function() {
-      log.debug('txjson %s', tx.toJSON())
       log.debug('oracle.processTx: try remove utxo %s', input)
       if (input.prevTxId !== undefined) {
         const res = await db.oracleUtxo.remove(input.prevTxId, input.outputIndex)
@@ -105,7 +104,7 @@ async function processTx(tx) {
     }
   }
 
-  log.debug('oracle.processTx: validOutputs %s, %s, validInputs %s, %s', validOutputs,  validInputs)
+  log.debug('oracle.processTx: validOutputs %s, validInputs %s', validOutputs,  validInputs)
   if (Object.keys(validOutputs).length <= 0 && Object.keys(validInputs).length <= 0) {
     return false
   } 
