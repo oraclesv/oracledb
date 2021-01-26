@@ -11,6 +11,7 @@
     "single-test": "mocha --reporter spec --timeout 600000"
   },
   "dependencies": {
+    "bigint-buffer": "^1.1.5",
     "bitcoind-rpc": "^0.8.1",
     "bsv": "^1.5.4",
     "chai": "^4.2.0",

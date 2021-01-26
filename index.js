@@ -26,7 +26,7 @@ const daemon = {
     Bit.listen()
 
     // start http server
-    server.start(config.http)
+    server.start(config.http, config.rabin)
   }
 }
 const start = async function() {

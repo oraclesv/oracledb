@@ -42,7 +42,7 @@ async function insertToken() {
 
 describe('APP', function() {
   before(async function() {
-    server.start(config.http)
+    server.start(config.http, config.rabin)
     await db.init(config.db)
     await db.createIndex()
     //await db.tokenID.insert(tokenID, tokenName.toString(), tokenSymbol.toString())
@@ -78,7 +78,7 @@ describe('APP', function() {
     })
   })
 
-  it('./get_token_utxos', (done) => {
+  it('/get_token_utxos', (done) => {
     chai.request(app).get('/get_token_utxos').query({'address': address.toString(), 'tokenid': tokenID.toString('hex')}).end((err, res) => {
       console.log('res:', res.body)
       res.should.have.status(200)
@@ -87,6 +87,15 @@ describe('APP', function() {
       res.body.res[0].txid.should.equal(txid)
       res.body.res[0].outputIndex.should.equal(0)
       res.body.res[0].satoshis.should.equal('1000')
+      done()
+    })
+  })
+
+  it('/get_token_utxo_rabin_sig', (done) => {
+    chai.request(app).get('/get_token_utxo_rabin_sig').query({'txid': txid, 'outputindex': 0}).end((err, res) => {
+      console.log('res:', res.body)
+      res.should.have.status(200)
+      res.body.ok.should.equal(1)
       done()
     })
   })

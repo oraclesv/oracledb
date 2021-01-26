@@ -126,6 +126,26 @@ oracleUtxo = {
       return false
     }
   },
+  handleDoc: function(doc) {
+    doc['satoshis'] = BigInt(doc['satoshis'])
+    doc['txid'] = doc['txid'].read(0, doc['txid'].length())
+    doc['script'] = doc['script'].read(0, doc['script'].length())
+
+    if (doc['type'] == token.PROTO_TYPE) {
+      doc['tokenValue'] = BigInt(doc['tokenValue'])
+      doc['tokenID'] = doc['tokenID'].read(0, doc['tokenID'].length())
+      doc['tokenName'] = doc['tokenName'].read(0, doc['tokenName'].length())
+      doc['tokenSymbol'] = doc['tokenSymbol'].read(0, doc['tokenSymbol'].length())
+      doc['address'] = doc['address'].read(0, doc['address'].length())
+      log.info('db.oracleUtxo token remove utxo txid %s, outputIndex %s, address %s, tokenID %s, tokenValue %s, type %s, isGenesis %s', doc.txid.toString('hex'), doc.outputIndex, doc.address.toString('hex'), doc.tokenID.toString('hex'), doc.tokenValue, doc.type, doc.isGenesis)
+    }
+    else if (doc['type'] == unique.PROTO_TYPE) {
+      doc['uniqueID'] = doc['uniqueID'].read(0, doc['uniqueID'].length())
+      log.info('db.oracleUtxo unique remove utxo txid %s, outputIndex %s, uniqueID %s, type %s, isGenesis %s', doc.txid.toString('hex'), doc.outputIndex, doc.uniqueID.toString('hex'), doc.type, doc.isGenesis)
+    }
+    return doc
+  },
+
   remove: async function(txid, outputIndex) {
     const id = oracleUtxo.genid(txid, outputIndex)
     const res = await db.collection(ORACLE_UTXO).findOneAndDelete(
@@ -135,23 +155,7 @@ oracleUtxo = {
       log.debug('db.oracleUtxo remove res: %s, %s', res, res.value)
       let value = null
       if (res.value !== null) {
-        value = res.value
-        value['satoshis'] = BigInt(value['satoshis'])
-        value['txid'] = value['txid'].read(0, value['txid'].length())
-        value['script'] = value['script'].read(0, value['script'].length())
-
-        if (value['type'] == token.PROTO_TYPE) {
-          value['tokenValue'] = BigInt(value['tokenValue'])
-          value['tokenID'] = value['tokenID'].read(0, value['tokenID'].length())
-          value['tokenName'] = value['tokenName'].read(0, value['tokenName'].length())
-          value['tokenSymbol'] = value['tokenSymbol'].read(0, value['tokenSymbol'].length())
-          value['address'] = value['address'].read(0, value['address'].length())
-          log.info('db.oracleUtxo token remove utxo txid %s, outputIndex %s, address %s, tokenID %s, tokenValue %s, type %s, isGenesis %s', value.txid.toString('hex'), value.outputIndex, value.address.toString('hex'), value.tokenID.toString('hex'), value.tokenValue, value.type, value.isGenesis)
-        }
-        else if (value['type'] == unique.PROTO_TYPE) {
-          value['uniqueID'] = value['uniqueID'].read(0, value['uniqueID'].length())
-          log.info('db.oracleUtxo unique remove utxo txid %s, outputIndex %s, uniqueID %s, type %s, isGenesis %s', value.txid.toString('hex'), value.outputIndex, value.uniqueID.toString('hex'), value.type, value.isGenesis)
-        }
+        value = oracleUtxo.handleDoc(res.value)
       }
       return value
     } else {
@@ -183,7 +187,27 @@ oracleUtxo = {
   },
   clear: async function() {
     await db.collection(ORACLE_UTXO).deleteMany({})
-  }
+  },
+
+  getByTxId: async function(txid, outputIndex) {
+    const id = oracleUtxo.genid(txid, outputIndex)
+    let res
+    try {
+      res = await db.collection('utxo').findOne(
+        query = {'_id': id},
+        options = {'readPreference': ReadPreference.SECONDARY_PREFERRED}
+        )
+    } catch (e) {
+      log.error('oracleUtxo.getByTxId error:', e)
+      return null
+    }
+    let doc = null
+    if (res !== null) {
+      doc = oracleUtxo.handleDoc(res)
+    }
+    log.debug('oracleUtxo.getByTxId doc: %s', doc)
+    return doc
+  },
 }
 
 let createIndex = async function() {

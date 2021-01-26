@@ -289,7 +289,7 @@ const syncUtxoCache = async function() {
 const syncTokenIDCache = async function() {
   const tokenIDList = await db.tokenID.getAllTokenIDs()
   for (const data of tokenIDList) {
-    cache.addTokenIDInfo(data.tokenID, data.name, token.symbol)
+    cache.addTokenIDInfo(data.tokenID, data.name, data.symbol)
   }
 }
 
