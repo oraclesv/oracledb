@@ -95,6 +95,7 @@ token.processTx = async function(tx, validInputs, validOutputs) {
   // count the input token value
   const inValue = {}
   const inputTokenOracleData = {}
+  const genesisTokens = {}
   for (const inputData of validInputs) {
     //const input = inputData[0]
     const script = inputData[1]
@@ -110,6 +111,7 @@ token.processTx = async function(tx, validInputs, validOutputs) {
     if (genesisFlag === 1) {
       tokenIDHex = Buffer.from(bsv.crypto.Hash.sha256ripemd160(script)).toString('hex')
       log.debug('genesis calculate tokenID: %s', tokenIDHex)
+      genesisTokens[tokenIDHex] = script
     }
     inputTokenOracleData[tokenIDHex] = TokenProto.getOracleData(script)
   }
@@ -130,12 +132,6 @@ token.processTx = async function(tx, validInputs, validOutputs) {
       log.debug('token.processTx: check genesis args: %s, %s', outputData[0], outputData[1])
       if (value === BigInt(0) && tokenID.compare(TokenProto.GENESIS_TOKEN_ID) === 0 && address.compare(TokenProto.EMPTY_ADDRESS) === 0) {
         token.insertTokenIDOutput(tx.id, tokenID, [outputData], tasks, limit)
-        const newTokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(script))
-        // try add new token ID
-        const name = TokenProto.getTokenName(script)
-        const symbol = TokenProto.getTokenSymbol(script)
-        db.tokenID.insert(newTokenID, name, symbol)
-        cache.addTokenIDInfo(newTokenID.toString('hex'), name.toString('hex'), symbol.toString('hex'))
       }
       continue
     }
@@ -151,29 +147,24 @@ token.processTx = async function(tx, validInputs, validOutputs) {
     tokenIDOutputs[tokenIDHex].push(outputData)
   }
 
-  // compare token input and output
-  const invalidTokenID = []
+  // compare token input and output sum amount
   for (const tokenIDHex in outValue) {
     // check the contract code
     log.debug("token.processTx: validInputs %s, %s", tokenIDHex, validInputs[tokenIDHex])
-    if (outValue[tokenIDHex] > inValue[tokenIDHex]) {
-      invalidTokenID.push(tokenIDHex)
-      log.info("token.processTx invalidTokenID %s, txid %s, outvalue %s, invalue %s", tokenIDHex, tx.id, outValue[tokenIDHex], inValue[tokenIDHex])
-    } else {
+    // if the output token amount <= input token amount, or input has genesis tx input
+    if (outValue[tokenIDHex] <= inValue[tokenIDHex] || genesisTokens[tokenIDHex] !== undefined) {
       token.insertTokenIDOutput(tx.id, Buffer.from(tokenIDHex, 'hex'), tokenIDOutputs[tokenIDHex], tasks, limit)
-    }
-  }
-
-  // check the genesis input
-  for (const tokenIDHex of invalidTokenID) {
-    // need to check if has genesis token 
-    for (const inputData of validInputs) {
-      const script = inputData[1]
-      const inputScriptHash = Buffer.from(bsv.crypto.Hash.sha256ripemd160(script))
-      log.debug("check input script hash: %s, tokenID %s", inputScriptHash.toString('hex'), tokenIDHex)
-      if (inputScriptHash.toString('hex') === tokenIDHex) {
-        token.insertTokenIDOutput(tx.id, Buffer.from(tokenIDHex, 'hex'), tokenIDOutputs[tokenIDHex], tasks, limit)
+      if (genesisTokens[tokenIDHex] !== undefined) {
+        // if input is the genesis tx, then try to add new token ID
+        const script = genesisTokens[tokenIDHex]
+        const name = TokenProto.getTokenName(script)
+        const symbol = TokenProto.getTokenSymbol(script)
+        const newTokenID = Buffer.from(tokenIDHex, 'hex')
+        db.tokenID.insert(newTokenID, name, symbol)
+        cache.addTokenIDInfo(tokenIDHex, name.toString('hex'), symbol.toString('hex'))
       }
+    } else {
+      log.info("token.processTx invalidTokenID %s, txid %s, outvalue %s, invalue %s", tokenIDHex, tx.id, outValue[tokenIDHex], inValue[tokenIDHex])
     }
   }
 

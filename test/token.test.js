@@ -178,11 +178,6 @@ describe('token', function() {
     assert.strictEqual(pres, true)
     assert.strictEqual(cache.hasUtxo(genesisTx.id, 0), true)
 
-    // check tokenID collection
-    const tokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(genesisTx.outputs[0].script.toBuffer()))
-    const tokenIDRes = await db.tokenID.findOne(tokenID)
-    assert.strictEqual(tokenIDRes.tokenID.compare(tokenID), 0)
-
     const res = await db.oracleUtxo.remove(genesisTx.id, 0)
     //console.log("remove res:", res)
     assert.notStrictEqual(res, null)
@@ -231,6 +226,11 @@ describe('token', function() {
     const genesisTx = await genGenesis()
     await oracle.processTx(genesisTx)
     const tokenTx = await genToken(genesisTx)
+
+    // check tokenID collection
+    const newTokenID = Buffer.from(bsv.crypto.Hash.sha256ripemd160(genesisTx.outputs[0].script.toBuffer()))
+    const tokenIDRes = await db.tokenID.findOne(newTokenID)
+    assert.strictEqual(tokenIDRes.tokenID.compare(newTokenID), 0)
 
     const transferTx = await genTokenTransfer(tokenTx)
 
@@ -436,7 +436,7 @@ describe('token', function() {
     }))
 
     tokenValue2 = BigInt(100)
-    tokenValue3 = tokenValue - tokenValue2 + BigInt(add)
+    tokenValue3 = tokenValue - tokenValue2
 
     let outputScript = TokenProto.getNewTokenScript(tokenScript.toBuffer(), address, tokenValue2)
     tx.addOutput(new bsv.Transaction.Output({
@@ -464,5 +464,10 @@ describe('token', function() {
 
     res = await oracle.processTx(tx)
     res.should.equal(true)
+
+    for (let i = 0; i < 4; i++) {
+      res = await db.oracleUtxo.remove(tx.id, i)
+      res.txid.toString('hex').should.equal(tx.id)
+    }
   })
 })
