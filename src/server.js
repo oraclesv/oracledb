@@ -102,7 +102,8 @@ server.start = function(config, rabinConfig) {
     const data = {
       'msg': msg.toString('hex'),
       'sig': sigBuf.toString('hex'),
-      'padding': padding.toString('hex')
+      'padding': padding.toString('hex'),
+      'pubkey': pubKey.toString(),
     }
     res.json({'ok': 1, 'res': data})
   })
