@@ -75,6 +75,7 @@ describe('APP', function() {
       //res.body.res.should.have.lengthOf(1)
       res.body.res[tokenID].name.should.equal(tokenName.toString())
       res.body.res[tokenID].symbol.should.equal(tokenSymbol.toString())
+      res.body.res[tokenID].decimalNum.should.equal(decimalNum)
       done()
     })
   })
