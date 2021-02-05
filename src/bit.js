@@ -12,6 +12,7 @@ const db = require('./db')
 
 let Info
 let rpc
+let outSock
 
 const unconfirmed = {}
 
@@ -193,6 +194,11 @@ const listen = function() {
     }
   })
 
+  // bind to ZMQ
+  , outSock = zmq.socket('pub')
+  outSock.bindSync('tcp://' + config.zmq.outcoming.host + ':' + config.zmq.outcoming.port)
+  log.info('Publisher bind to %s:%s', config.zmq.outcoming.host, config.zmq.outcoming.port)
+
   // Don't trust ZMQ. Try synchronizing every 2 minute in case ZMQ didn't fire
   setInterval(async function() {
     await syncBlock()
@@ -226,6 +232,8 @@ const processTx = async function(tx) {
     delete jsontx['hash']
     jsontx['confirmed'] = 0 
     await db.tx.insert(jsontx)
+    // publisher to other
+    await outSock.send(['rawtx', tx.serialize()])
   }
 }
 

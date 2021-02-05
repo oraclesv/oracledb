@@ -18,6 +18,10 @@ module.exports = {
     'incoming': {
       'host': '127.0.0.1',
       'port': '28000'
+    },
+    'outcoming': {
+      'host': '127.0.0.1',
+      'port': '29000'
     }
   },
   'logger': {
