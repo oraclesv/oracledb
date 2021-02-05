@@ -159,9 +159,10 @@ token.processTx = async function(tx, validInputs, validOutputs) {
         const script = genesisTokens[tokenIDHex]
         const name = TokenProto.getTokenName(script)
         const symbol = TokenProto.getTokenSymbol(script)
+        const decimalNum = TokenProto.getDecimalNum(script)
         const newTokenID = Buffer.from(tokenIDHex, 'hex')
-        db.tokenID.insert(newTokenID, name, symbol)
-        cache.addTokenIDInfo(tokenIDHex, name.toString('hex'), symbol.toString('hex'))
+        db.tokenID.insert(newTokenID, name, symbol, decimalNum)
+        cache.addTokenIDInfo(tokenIDHex, name.toString('hex'), symbol.toString('hex'), decimalNum)
       }
     } else {
       log.info("token.processTx invalidTokenID %s, txid %s, outvalue %s, invalue %s", tokenIDHex, tx.id, outValue[tokenIDHex], inValue[tokenIDHex])

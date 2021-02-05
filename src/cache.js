@@ -56,8 +56,8 @@ Cache.hasUtxo = function(txid, index) {
 
 
 const tokenIDData = {}
-Cache.addTokenIDInfo = function(tokenID, name, symbol) {
-  tokenIDData[tokenID] = {'name': name, 'symbol': symbol}
+Cache.addTokenIDInfo = function(tokenID, name, symbol, decimalNum) {
+  tokenIDData[tokenID] = {'name': name, 'symbol': symbol, 'decimalNum': decimalNum}
 }
 
 Cache.getAllTokenIDInfo = function() {

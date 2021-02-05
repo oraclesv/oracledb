@@ -201,6 +201,7 @@ oracleUtxo = {
       log.error('oracleUtxo.getByTxId error:', e)
       return null
     }
+    log.debug('db.utxo getByTxId res: %s', res)
     let doc = null
     if (res !== null) {
       doc = oracleUtxo.handleDoc(res)
@@ -271,11 +272,11 @@ let wallet = {
 
 const TOKEN_ID = 'tokenid'
 let tokenID = {
-  insert: async function(tokenID, name, symbol) {
+  insert: async function(tokenID, name, symbol, decimalNum) {
     try {
       const res = await db.collection(TOKEN_ID).updateOne(
         filter = {'_id': Binary(tokenID)},
-        update = {'$set': {'name': Binary(name), 'symbol': Binary(symbol)}},
+        update = {'$set': {'name': Binary(name), 'symbol': Binary(symbol), 'decimalNum': decimalNum}},
         options = {'upsert': 1}
       )
       if (res.result['ok'] === 1) {
@@ -297,7 +298,8 @@ let tokenID = {
       const data = {
         tokenID: doc['_id'].read(0, doc['_id'].length()).toString('hex'),
         name: doc.name.read(0, doc.name.length()).toString('hex'),
-        symbol: doc.symbol.read(0, doc.symbol.length()).toString('hex')
+        symbol: doc.symbol.read(0, doc.symbol.length()).toString('hex'),
+        decimalNum: doc.decimalNum
       }
       tokenIDs.push(data)
     })

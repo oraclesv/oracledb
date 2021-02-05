@@ -21,6 +21,7 @@ tokenSymbol.write('ttn')
 
 const txid = "b145b31e2b1b24103b0fc8f4b9e54953f5b90f9059559dd7612c629897b95820"
 const address = bsv.Address.fromString('msREe5jsynP65899v1KJCydf6Sc9pJPb8S')
+const decimalNum = 1
 
 async function insertToken() {
   const data = {
@@ -30,7 +31,7 @@ async function insertToken() {
     'address': address.hashBuffer,
     'tokenID': tokenID,
     'tokenValue': BigInt(100),
-    'decimalNum': 1,
+    'decimalNum': decimalNum,
     'isGenesis': 0,
     'type': TokenProto.PROTO_TYPE,
     'tokenName': tokenName,
@@ -46,7 +47,7 @@ describe('APP', function() {
     await db.init(config.db)
     await db.createIndex()
     //await db.tokenID.insert(tokenID, tokenName.toString(), tokenSymbol.toString())
-    cache.addTokenIDInfo(tokenID, tokenName.toString(), tokenSymbol.toString())
+    cache.addTokenIDInfo(tokenID, tokenName.toString(), tokenSymbol.toString(), decimalNum)
     await insertToken() 
   })
 
