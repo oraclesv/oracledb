@@ -29,10 +29,10 @@ unique.insertUniqueIDOutput = function(txId, uniqueID, outputData, tasks, limit)
   }
   tasks.push(limit(async function() {
     // insert wallet id
-    const walletId = await db.wallet.getWalletId(address)
-    if (walletId !== null) {
-      data['walletId'] = walletId
-    }
+    //const walletId = await db.wallet.getWalletId(address)
+    //if (walletId !== null) {
+    //  data['walletId'] = walletId
+    //}
     const res = await db.oracleUtxo.insert(data)
     return [res, txid, outputIndex]
   }))
