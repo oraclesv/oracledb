@@ -42,7 +42,7 @@ server.start = function(config, rabinConfig) {
       address = bsv.Address.fromString(params.address)
       tokenID = Buffer.from(params.tokenid, 'hex')
     } catch (e) {
-      log.error('get_token_utxos: %s', e)
+      log.warn('get_token_utxos wrong params: %s', e)
     }
 
     if (address === null || tokenID === null) {
