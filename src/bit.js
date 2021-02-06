@@ -122,7 +122,7 @@ const request = {
                 const txid = await processRawTx(rawtx)
                 return txid
               } catch(e) {
-                log.error("getRawMemPool error: %s")
+                log.error("getRawMemPool error: %s", e)
                 return null
               }
             }))
