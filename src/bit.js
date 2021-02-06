@@ -213,16 +213,16 @@ const processRawTx = async function(rawtx, confirmed=0) {
   tx.fromBuffer(rawtx)
   log.debug('processRawTx: id %s, confirmed %s', tx.id, confirmed)
   if (confirmed === 1) {
-    await processConfirmedTx(tx)
+    await processConfirmedTx(tx, rawtx)
   } else {
-    await processTx(tx)
+    await processTx(tx, rawtx)
   }
   return tx.id
 }
 
-const processTx = async function(tx) {
+const processTx = async function(tx, rawtx) {
   if (unconfirmed[tx.id] !== undefined) {
-    log.info("processTx: repeat txid %s", tx.id)
+    log.debug("processTx: repeat txid %s", tx.id)
     return
   }
   let res = await oracle.processTx(tx)
@@ -235,11 +235,11 @@ const processTx = async function(tx) {
     jsontx['confirmed'] = 0 
     await db.tx.insert(jsontx)
     // publisher to other
-    await outSock.send(['rawtx', tx.serialize()])
+    await outSock.send(['rawtx', rawtx])
   }
 }
 
-const processConfirmedTx = async function(tx) {
+const processConfirmedTx = async function(tx, rawtx) {
   if (unconfirmed[tx.id] !== undefined) {
     if (unconfirmed[tx.id] === true) {
       await db.tx.updateConfirmed(tx.id, 1)
@@ -255,6 +255,7 @@ const processConfirmedTx = async function(tx) {
       delete jsontx['hash']
       jsontx['confirmed'] = 1
       await db.tx.insert(jsontx)
+      await outSock.send(['rawtx', rawtx])
     }
   }
 }
