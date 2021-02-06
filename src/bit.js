@@ -194,16 +194,18 @@ const listen = function() {
     }
   })
 
-  // bind to ZMQ
-  , outSock = zmq.socket('pub')
-  outSock.bindSync('tcp://' + config.zmq.outcoming.host + ':' + config.zmq.outcoming.port)
-  log.info('Publisher bind to %s:%s', config.zmq.outcoming.host, config.zmq.outcoming.port)
-
   // Don't trust ZMQ. Try synchronizing every 2 minute in case ZMQ didn't fire
   setInterval(async function() {
     await syncBlock()
   }, 120000)
 
+}
+
+const startPub = async function() {
+  // bind to ZMQ
+  outSock = zmq.socket('pub')
+  outSock.bindSync('tcp://' + config.zmq.outcoming.host + ':' + config.zmq.outcoming.port)
+  log.info('Publisher bind to %s:%s', config.zmq.outcoming.host, config.zmq.outcoming.port)
 }
 
 const processRawTx = async function(rawtx, confirmed=0) {
@@ -308,6 +310,8 @@ const run = async function() {
 
   // clear all unconfirmed tx
   await db.tx.removeAllUnconfirmed()
+
+  await startPub()
 
   // initial block sync
   await syncBlock()
